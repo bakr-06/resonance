@@ -1,0 +1,63 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+*.egg
+dist/
+*.whl
+*.so
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Gradle (client/)
+.gradle/
+**/build/
+!src/**/build/
+local.properties
+*.iml
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Gradle wrapper jar (should be checked in, but keep for safety)
+# gradle-wrapper.jar is typically checked in; uncomment if needed
+# client/gradle/wrapper/gradle-wrapper.jar
+
+# Misc
+*.log
+.env
+.env.local
+.env.*.local
+.cache/
+out/
+*.hprof
+
+*.iml
+.kotlin
+.gradle
+**/build/
+xcuserdata
+!src/**/build/
+local.properties
+captures
+.externalNativeBuild
+.cxx
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+!*.xcodeproj/project.xcworkspace/
+!*.xcworkspace/contents.xcworkspacedata
+**/xcshareddata/WorkspaceSettings.xcsettings
+node_modules/
