@@ -2,4 +2,9 @@ fastapi
 uvicorn
 python-multipart
 openai-whisper
-google-generativeai
+google-genai
+protobuf
+openrouter	
+python-dotenv
+pydantic-settings
+httpx
