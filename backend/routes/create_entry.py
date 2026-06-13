@@ -7,7 +7,6 @@ from fastapi import APIRouter, File, UploadFile, HTTPException, Form, Request
 
 from services import stt
 from services.stt_cleanup import clean_transcript
-from services.song_metadata import search_song_metadata
 
 router = APIRouter()
 
@@ -17,8 +16,6 @@ ALLOWED_AUDIO_TYPES = {"audio/wav", "audio/wave", "audio/mpeg", "audio/mp3"}
 @router.post("/create_entry")
 async def create_entry(
         request: Request,
-        song_name: str = Form(...),
-        artist_name: str = Form(...),
         description_file: UploadFile = File(...)):
     if description_file.content_type not in ALLOWED_AUDIO_TYPES:
         raise HTTPException(
@@ -43,10 +40,7 @@ async def create_entry(
         os.unlink(tmp_path)
 
     cleaned_text = await clean_transcript(raw_text)
-    client = request.app.state.http_client
-    song_metadata = await search_song_metadata(song_name, artist_name, client=client)
 
     return {
-        "metadata": song_metadata,
         "transcription": cleaned_text,
     }

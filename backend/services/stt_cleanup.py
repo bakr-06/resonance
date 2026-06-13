@@ -14,11 +14,9 @@ async def clean_transcript(
         raw_text: str,
         llm_model: str = FREE_MODEL,
 ) -> str:
-    system_prompt = """You are a speech-to-text cleanup assistant. The user is recording
-    their feelings and thoughts about a song they are listening to — this is a music
-    listening context. Correct any transcription errors in their spoken message.
-    Preserve their exact meaning, sentiment, and wording. Do not rephrase or summarize.
-    Return ONLY the corrected transcript, nothing else."""
+    system_prompt = """You are a speech-to-text cleanup assistant. Correct any transcription errors
+    in the user's spoken message. Preserve their exact meaning, sentiment, and wording.
+    Do not rephrase or summarize. Return ONLY the corrected transcript, nothing else."""
     try:
         async with OpenRouter(api_key=settings.openrouter_api_key) as client:
             response = await client.chat.send_async(
