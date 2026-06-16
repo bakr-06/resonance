@@ -14,7 +14,7 @@ class Entry(Base):
     __tablename__ = "entry"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    text: Mapped[str] = mapped_column(Text)
+    transcript: Mapped[str] = mapped_column(Text)
     analysis: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)

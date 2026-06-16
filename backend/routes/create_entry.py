@@ -95,7 +95,7 @@ def build_entry(
     return Entry(
         id=entry_id,
         created_at=created_at,
-        text=whisper_result["raw_text"],
+        transcript=whisper_result["raw_text"],
         analysis=analysis_result["reflection"],
         detected_mode=analysis_result["detected_mode"],
         transcription_metrics=TranscriptionMetrics(
