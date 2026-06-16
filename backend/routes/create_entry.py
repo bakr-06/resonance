@@ -55,7 +55,7 @@ async def validate_audio_file(file: UploadFile) -> tuple[bytes, str]:
 
     content = await file.read()
     if not content:
-        raise HTTPException(status_code=400, detail="Empty file uploaded")
+        raise HTTPException(status_code=HTTPStatus.UNPROCESSABLE_ENTITY, detail="Empty file uploaded")
 
     return content, pathlib.Path(file.filename).suffix
 
