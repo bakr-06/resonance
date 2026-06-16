@@ -2,9 +2,9 @@ fastapi
 uvicorn
 python-multipart
 openai-whisper
-google-genai
-protobuf
-openrouter	
+openrouter
 python-dotenv
 pydantic-settings
 httpx
+sqlalchemy
+pydantic

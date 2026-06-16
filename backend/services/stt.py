@@ -1,11 +1,24 @@
+from typing import TypedDict
+
 import whisper
 
 Model = whisper.Whisper
 
 _model: Model = whisper.load_model("base")
 
-Segment = dict[str, float | str | None]
-TranscribeResult = dict[str, str | float | int | None | list[Segment]]
+
+class Segment(TypedDict):
+    start: float
+    end: float
+    text: str
+    confidence: float | None
+
+
+class TranscribeResult(TypedDict):
+    raw_text: str
+    detected_language: str | None
+    segments: list[Segment]
+    duration_ms: int
 
 
 async def transcribe(audio_path: str) -> TranscribeResult:

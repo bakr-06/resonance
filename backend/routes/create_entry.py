@@ -3,11 +3,13 @@ import pathlib
 import tempfile
 import time
 import uuid
+from datetime import datetime, timezone
 from http import HTTPStatus
-from typing import Any
-
 from fastapi import APIRouter, File, UploadFile, HTTPException, Request
 
+from db.database import DbSession
+from db.models import AnalysisMetrics, Entry, TranscriptionMetrics
+from schemas.entry import AnalysisInfo, CreateEntryResponse, TranscriptionInfo
 from services import stt
 from services.ai_analysis import analyze
 
@@ -16,10 +18,12 @@ router: APIRouter = APIRouter()
 ALLOWED_AUDIO_TYPES: set[str] = {"audio/wav", "audio/wave", "audio/mpeg", "audio/mp3"}
 
 
-@router.post("/create_entry")
+@router.post("/create_entry", response_model=CreateEntryResponse)
 async def create_entry(
         request: Request,
-        file: UploadFile = File(...)) -> dict[str, Any]:
+        db_session: DbSession,
+        file: UploadFile = File(...),
+) -> CreateEntryResponse:
     if file.content_type not in ALLOWED_AUDIO_TYPES:
         raise HTTPException(
             status_code=HTTPStatus.UNSUPPORTED_MEDIA_TYPE,
@@ -34,7 +38,7 @@ async def create_entry(
         raise HTTPException(status_code=400, detail="Empty file uploaded")
 
     entry_id: uuid.UUID = uuid.uuid4()
-    created_at: float = time.time()
+    created_at: datetime = datetime.now(timezone.utc)
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(content)
@@ -49,31 +53,58 @@ async def create_entry(
     whisper_ms: int = int(round((t1 - t0) * 1000))
 
     openrouter_client = request.app.state.openrouter_client
-    t2: float = time.time()
-    cleanup_ms: int = int(round((t2 - t1) * 1000))
 
     analysis_result = await analyze(whisper_result["raw_text"], openrouter_client)  # type: ignore[arg-type]
-    t3: float = time.time()
-    analysis_ms: int = int(round((t3 - t2) * 1000))
+    t2: float = time.time()
+    analysis_ms: int = int(round((t2 - t1) * 1000))
 
-    return {
-        "id": entry_id,
-        "created_at": created_at,
-        "filename": file.filename,
-        "content_type": file.content_type,
-        "raw_transcript": whisper_result["raw_text"],
-        "detected_language": whisper_result["detected_language"],
-        "transcription_segments": whisper_result["segments"],
-        "transcription_duration_ms": whisper_result["duration_ms"],
-        "reflection": analysis_result["reflection"],
-        "detected_mode": analysis_result["detected_mode"],
-        "analysis_model_used": analysis_result["model_used"],
-        "analysis_prompt_tokens": analysis_result["prompt_tokens"],
-        "analysis_completion_tokens": analysis_result["completion_tokens"],
-        "openrouter_request_id": analysis_result["request_id"],
-        "analysis_created_at": analysis_result["created_at"],
-        "whisper_processing_ms": whisper_ms,
-        "cleanup_processing_ms": cleanup_ms,
-        "analysis_processing_ms": analysis_ms,
-        "total_processing_ms": whisper_ms + cleanup_ms + analysis_ms,
-    }
+    entry = Entry(
+        id=entry_id,
+        text=whisper_result["raw_text"],
+        analysis=analysis_result["reflection"],
+        created_at=created_at,
+        detected_mode=analysis_result["detected_mode"],
+        analysis_metrics=AnalysisMetrics(
+            prompt_tokens=analysis_result["prompt_tokens"],
+            completion_tokens=analysis_result["completion_tokens"],
+            openrouter_request_id=analysis_result["request_id"],
+            model_used=analysis_result["model_used"],
+            created_at=datetime.fromtimestamp(analysis_result["created_at"], tz=timezone.utc),
+            processing_ms=analysis_ms,
+        ),
+        transcription_metrics=TranscriptionMetrics(
+            transcript_segments=whisper_result["segments"],
+            transcript_duration_ms=whisper_result["duration_ms"],
+            processing_ms=whisper_ms,
+            detected_language=whisper_result["detected_language"],
+        ),
+    )
+
+    db_session.add(entry)
+    await db_session.commit()
+    await db_session.refresh(entry)
+
+    return CreateEntryResponse(
+        id=entry_id,
+        created_at=created_at.isoformat(),
+        filename=file.filename,
+        content_type=file.content_type,
+        raw_transcript=whisper_result["raw_text"],
+        whisper=TranscriptionInfo(
+            detected_language=whisper_result["detected_language"],
+            segments=whisper_result["segments"],
+            duration_ms=whisper_result["duration_ms"],
+            processing_ms=whisper_ms,
+        ),
+        analysis=AnalysisInfo(
+            reflection=analysis_result["reflection"],
+            detected_mode=analysis_result["detected_mode"],
+            model_used=analysis_result["model_used"],
+            prompt_tokens=analysis_result["prompt_tokens"],
+            completion_tokens=analysis_result["completion_tokens"],
+            request_id=analysis_result["request_id"],
+            created_at=analysis_result["created_at"],
+            processing_ms=analysis_ms,
+        ),
+        total_processing_ms=whisper_ms + analysis_ms,
+    )

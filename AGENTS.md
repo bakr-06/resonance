@@ -10,7 +10,6 @@ Monorepo with `backend/` (Python FastAPI) and `client/` (Kotlin Multiplatform / 
 - **Architecture**:
   - Uploaded audio saved to temp file, deleted in `finally`
   - `stt.py` → whisper "base" model → raw text → `stt_cleanup.py` → OpenRouter `openrouter/free` for cleanup
-  - `search_song_metadata()` queries MusicBrainz **work** endpoint async via `httpx`
   - On OpenRouter `401`, returns raw text with log warning
 - **Validation**: Only `.wav`/`.mp3` allowed (checked by MIME type); empty files rejected
 - **Testing**: No test framework configured — use `curl` or `test_main.http` (JetBrains HTTP client)

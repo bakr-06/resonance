@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from openrouter import OpenRouter
 
 from config import settings
+from db.database import engine
 from routes.create_entry import router as create_entry_router
 
 
@@ -20,6 +21,7 @@ async def lifespan(fastapi_app: FastAPI) -> AsyncIterator[None]:
     )
     yield
     await async_client.aclose()
+    await engine.dispose()
 
 
 app: FastAPI = FastAPI(lifespan=lifespan)
