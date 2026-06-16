@@ -22,10 +22,10 @@ class Entry(Base):
     detected_mode: Mapped[str | None] = mapped_column(String(20))
 
     transcription_metrics: Mapped["TranscriptionMetrics"] = relationship(
-        back_populates="entry", uselist=False
+        back_populates="entry", uselist=False, cascade="all, delete-orphan"
     )
     analysis_metrics: Mapped["AnalysisMetrics"] = relationship(
-        back_populates="entry", uselist=False
+        back_populates="entry", uselist=False, cascade="all, delete-orphan"
     )
 
 

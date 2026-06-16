@@ -8,7 +8,7 @@ from openrouter import OpenRouter
 
 from config import settings
 from db.database import engine
-from routes.create_entry import router as create_entry_router
+from routes import router
 
 
 @asynccontextmanager
@@ -26,7 +26,7 @@ async def lifespan(fastapi_app: FastAPI) -> AsyncIterator[None]:
 
 app: FastAPI = FastAPI(lifespan=lifespan)
 
-app.include_router(create_entry_router)
+app.include_router(router)
 
 
 @app.get("/")

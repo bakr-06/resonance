@@ -6,7 +6,7 @@ Monorepo with `backend/` (Python FastAPI) and `client/` (Kotlin Multiplatform / 
 
 - **Entrypoint**: `backend/main.py` — run with `uvicorn main:app --reload` from `backend/`
 - **Config**: `config.py` uses `pydantic-settings` — create `backend/.env` from `.env.example` with `OPENROUTER_API_KEY`
-- **Endpoints**: `POST /create_entry` accepts form fields `song_name`, `artist_name` + file `description_file`
+- **Endpoints**: `POST /entries` accepts file upload, returns analysis
 - **Architecture**:
   - Uploaded audio saved to temp file, deleted in `finally`
   - `stt.py` → whisper "base" model → raw text → `stt_cleanup.py` → OpenRouter `openrouter/free` for cleanup

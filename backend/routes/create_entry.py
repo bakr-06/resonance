@@ -6,7 +6,7 @@ import uuid
 from datetime import datetime, timezone
 from http import HTTPStatus
 
-from fastapi import APIRouter, File, UploadFile, HTTPException, Request
+from fastapi import File, UploadFile, HTTPException, Request
 
 from db.database import DbSession
 from db.models import AnalysisMetrics, Entry, TranscriptionMetrics
@@ -14,12 +14,12 @@ from schemas.entry import AnalysisInfo, CreateEntryResponse, TranscriptionInfo
 from services import stt
 from services.ai_analysis import analyze
 
-router: APIRouter = APIRouter()
+from . import router
 
 ALLOWED_AUDIO_TYPES: set[str] = {"audio/wav", "audio/wave", "audio/mpeg", "audio/mp3"}
 
 
-@router.post("/create_entry", response_model=CreateEntryResponse)
+@router.post("/entries", response_model=CreateEntryResponse)
 async def create_entry(
         request: Request,
         db_session: DbSession,
