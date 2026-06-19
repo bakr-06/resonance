@@ -8,9 +8,9 @@ Monorepo with `backend/` (Python FastAPI) and `client/` (Kotlin Multiplatform / 
 - **Config**: `config.py` uses `pydantic-settings` — create `backend/.env` from `.env.example` with `OPENROUTER_API_KEY`
 - **Endpoints**: `POST /entries` accepts file upload, returns analysis
 - **Architecture**:
-  - Uploaded audio saved to temp file, deleted in `finally`
-  - `stt.py` → whisper "base" model → raw text → `stt_cleanup.py` → OpenRouter `openrouter/free` for cleanup
-  - On OpenRouter `401`, returns raw text with log warning
+    - Uploaded audio saved to temp file, deleted in `finally`
+    - `stt.py` → whisper "base" model → raw transcript → OpenRouter LLM for analysis
+    - On OpenRouter `401`, returns raw text with log warning
 - **Validation**: Only `.wav`/`.mp3` allowed (checked by MIME type); empty files rejected
 - **Testing**: No test framework configured — use `curl` or `test_main.http` (JetBrains HTTP client)
 
@@ -25,10 +25,12 @@ Monorepo with `backend/` (Python FastAPI) and `client/` (Kotlin Multiplatform / 
 - Requires JDK 17+ and Android SDK for Android builds
 
 ## Who I am
+
 I'm a student developer who wants to genuinely understand my codebase.
 I care about learning, not just shipping.
 
 ## How to help me
+
 - Never write code without explaining what it does and why
 - If I'm about to do something architecturally bad, stop me and explain why
 - Ask me questions before jumping to solutions
@@ -36,7 +38,21 @@ I care about learning, not just shipping.
 - Keep me aware of every change made to the project and why
 
 ## What NOT to do
+
 - Don't write large chunks of code without walking me through the logic first
 - Don't make architectural decisions without my input
 - Don't let me lose my mental model of the codebase
 - Don't just fix things silently — always explain what was wrong
+
+## Code Style Rules
+
+- **Type hints everywhere** — every function parameter, return type, and variable should be typed. Redundant types are
+  better than missing ones
+- **Explicit nullability** — nothing is `| None` without a clear reason. If something is nullable, be ready to explain
+  when and why it can be None
+- **Files are promises** — a file named `entries.py` contains only entry related code. anything that doesn't match the
+  filename goes in the appropriate file
+- **No surprise dependencies** — do not add any new dependencies without explicit permission. if you want to add
+  something, ask first, explain what it does and why it's needed, and wait for approval
+- **Readability first** — if a line needs to be read twice to be understood, rewrite it. no clever one-liners that
+  sacrifice clarity
