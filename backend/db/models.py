@@ -22,10 +22,10 @@ class Entry(Base):
     detected_mode: Mapped[str | None] = mapped_column(String(20))
 
     transcription_metrics: Mapped["TranscriptionMetrics"] = relationship(
-        back_populates="entry", uselist=False
+        back_populates="entry", uselist=False, cascade="all, delete-orphan"
     )
     analysis_metrics: Mapped["AnalysisMetrics"] = relationship(
-        back_populates="entry", uselist=False
+        back_populates="entry", uselist=False, cascade="all, delete-orphan"
     )
 
 
@@ -39,6 +39,7 @@ class TranscriptionMetrics(Base):
     transcript_duration_ms: Mapped[int] = mapped_column(Integer)
     processing_ms: Mapped[int] = mapped_column(Integer)
     detected_language: Mapped[str | None] = mapped_column(String(10))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
     entry: Mapped["Entry"] = relationship(back_populates="transcription_metrics")
 
