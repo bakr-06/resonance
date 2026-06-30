@@ -1,11 +1,46 @@
-# Test your FastAPI endpoints
-
+### Health check
 GET http://127.0.0.1:8000/
 Accept: application/json
 
 ###
 
-GET http://127.0.0.1:8000/hello/User
+### Create a session
+POST http://127.0.0.1:8000/sessions
 Accept: application/json
 
 ###
+
+### List all sessions
+GET http://127.0.0.1:8000/sessions
+Accept: application/json
+
+###
+
+### Get a specific session (replace with actual ID)
+GET http://127.0.0.1:8000/sessions/REPLACE_WITH_SESSION_ID
+Accept: application/json
+
+###
+
+### Create an exchange in a session (replace with actual ID)
+POST http://127.0.0.1:8000/sessions/REPLACE_WITH_SESSION_ID/exchanges
+Content-Type: multipart/form-data; boundary=----boundary
+
+------boundary
+Content-Disposition: form-data; name="file"; filename="voice.wav"
+Content-Type: audio/wav
+
+< ./voice.wav
+------boundary--
+
+###
+
+### End a session (replace with actual ID)
+POST http://127.0.0.1:8000/sessions/REPLACE_WITH_SESSION_ID/end
+Accept: application/json
+
+###
+
+### Delete a session (replace with actual ID)
+DELETE http://127.0.0.1:8000/sessions/REPLACE_WITH_SESSION_ID
+Accept: application/json

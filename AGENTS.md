@@ -6,11 +6,12 @@ Monorepo with `backend/` (Python FastAPI) and `client/` (Kotlin Multiplatform / 
 
 - **Entrypoint**: `backend/main.py` — run with `uvicorn main:app --reload` from `backend/`
 - **Config**: `config.py` uses `pydantic-settings` — create `backend/.env` from `.env.example` with `OPENROUTER_API_KEY`
-- **Endpoints**: `POST /entries` accepts file upload, returns analysis
+- **Endpoints**: `POST /sessions` creates a session; `POST /sessions/{id}/exchanges` accepts file upload, returns
+  analysis
 - **Architecture**:
     - Uploaded audio saved to temp file, deleted in `finally`
     - `stt.py` → whisper "base" model → raw transcript → OpenRouter LLM for analysis
-    - On OpenRouter `401`, returns raw text with log warning
+    - On LLM failure, the exchange creation fails entirely (no partial creation)
 - **Validation**: Only `.wav`/`.mp3` allowed (checked by MIME type); empty files rejected
 - **Testing**: No test framework configured — use `curl` or `test_main.http` (JetBrains HTTP client)
 
@@ -50,7 +51,8 @@ I care about learning, not just shipping.
   better than missing ones
 - **Explicit nullability** — nothing is `| None` without a clear reason. If something is nullable, be ready to explain
   when and why it can be None
-- **Files are promises** — a file named `entries.py` contains only entry related code. anything that doesn't match the
+- **Files are promises** — a file named `exchanges.py` contains only exchange related code. anything that doesn't match
+  the
   filename goes in the appropriate file
 - **No surprise dependencies** — do not add any new dependencies without explicit permission. if you want to add
   something, ask first, explain what it does and why it's needed, and wait for approval

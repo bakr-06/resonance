@@ -13,6 +13,7 @@ from db.database import DbSession
 from db.models import AnalysisMetrics, Exchange, Session, TranscriptionMetrics
 from schemas.exchanges import ExchangeResponse
 from services import stt
+from openrouter import OpenRouter
 from services.ai_analysis import analyze
 
 from . import router
@@ -123,7 +124,7 @@ async def run_transcription(content: bytes, suffix: str) -> tuple[dict, int]:
     return result, elapsed_ms
 
 
-async def run_analysis(raw_text: str, openrouter_client) -> tuple[dict, int]:
+async def run_analysis(raw_text: str, openrouter_client: OpenRouter) -> tuple[dict, int]:
     t0 = time.time()
     result = await analyze(raw_text, openrouter_client)
     elapsed_ms = int(round((time.time() - t0) * 1000))
