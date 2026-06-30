@@ -1,5 +1,6 @@
 import json
 import re
+
 from typing import TypedDict
 
 from openrouter import OpenRouter
@@ -22,6 +23,10 @@ Respond only in JSON with exactly two fields:
 - "reflection": your full response text
 
 No preamble, no markdown, no backticks. Just raw JSON."""
+
+TITLE_PROMPT: str = """Generate a short, meaningful title (maximum 6 words) for a journaling session based on these journal entries. The title should capture the main theme or feeling of the session.
+
+Respond only with the title text — no quotes, no explanations, no punctuation beyond what's in the title itself."""
 
 
 class AnalysisResult(TypedDict):
@@ -64,3 +69,17 @@ async def analyze(message: str, client: OpenRouter) -> AnalysisResult:
         completion_tokens=response.usage.completion_tokens,
         request_id=response.id,
         created_at=response.created)
+
+
+async def generate_title(transcripts: list[str], client: OpenRouter) -> str:
+    combined = "\n\n".join(transcripts)
+    response = await client.chat.send_async(
+        model="openrouter/free",
+        messages=[
+            {"role": "user", "content": f"Journal entries:\n\n{combined}"},
+            {"role": "system", "content": TITLE_PROMPT},
+        ],
+    )
+    title = response.choices[0].message.content.strip()
+    title = re.sub(r'^["\']|["\']$', "", title)
+    return title

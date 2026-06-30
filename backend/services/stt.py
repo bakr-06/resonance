@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import TypedDict
 
 import whisper
@@ -19,6 +20,7 @@ class TranscribeResult(TypedDict):
     detected_language: str | None
     segments: list[Segment]
     duration_ms: int
+    created_at: datetime
 
 
 async def transcribe(audio_path: str) -> TranscribeResult:
@@ -32,9 +34,10 @@ async def transcribe(audio_path: str) -> TranscribeResult:
         }
         for s in result.get("segments", [])
     ]
-    return {
-        "raw_text": result["text"],
-        "detected_language": result.get("language"),
-        "segments": segments,
-        "duration_ms": int(round(segments[-1]["end"] * 1000)) if segments else 0,
-    }
+    return TranscribeResult(
+        raw_text=result["text"],
+        detected_language=result["language"],
+        segments=segments,
+        duration_ms=(result["segments"][-1]["end"]) * 1000,
+        created_at=datetime.now()
+    )
