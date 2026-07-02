@@ -17,7 +17,7 @@ from . import router
 
 @router.post("/sessions", response_model=CreateSessionResponse, status_code=HTTPStatus.CREATED)
 async def create_session(
-    db_session: DbSession,
+        db_session: DbSession,
 ) -> CreateSessionResponse:
     session = SessionModel()
     db_session.add(session)
@@ -30,9 +30,10 @@ async def create_session(
         is_active=session.is_active,
     )
 
+
 @router.get("/sessions", response_model=list[SessionResponse])
 async def list_sessions(
-    db_session: DbSession,
+        db_session: DbSession,
 ) -> list[SessionResponse]:
     result = await db_session.execute(
         select(SessionModel).order_by(SessionModel.created_at.desc())
@@ -54,8 +55,8 @@ async def list_sessions(
 
 @router.get("/sessions/{session_id}", response_model=SessionResponse)
 async def get_session(
-    session_id: uuid.UUID,
-    db_session: DbSession,
+        session_id: uuid.UUID,
+        db_session: DbSession,
 ) -> SessionResponse:
     result = await db_session.execute(
         select(SessionModel)
@@ -92,9 +93,9 @@ async def get_session(
 
 @router.post("/sessions/{session_id}/end", response_model=SessionResponse)
 async def end_session(
-    session_id: uuid.UUID,
-    request: Request,
-    db_session: DbSession,
+        session_id: uuid.UUID,
+        request: Request,
+        db_session: DbSession,
 ) -> SessionResponse:
     result = await db_session.execute(
         select(SessionModel)
@@ -148,8 +149,8 @@ async def end_session(
 
 @router.delete("/sessions/{session_id}", status_code=HTTPStatus.NO_CONTENT)
 async def delete_session(
-    session_id: uuid.UUID,
-    db_session: DbSession,
+        session_id: uuid.UUID,
+        db_session: DbSession,
 ) -> Response:
     session = await db_session.get(SessionModel, session_id)
     if session is None:

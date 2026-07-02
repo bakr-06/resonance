@@ -13,9 +13,7 @@ from db.database import DbSession
 from db.models import AnalysisMetrics, Exchange, Session, TranscriptionMetrics
 from schemas.exchanges import ExchangeResponse
 from services import stt
-from openrouter import OpenRouter
 from services.ai_analysis import analyze
-
 from . import router
 
 ALLOWED_AUDIO_TYPES: set[str] = {"audio/wav", "audio/wave", "audio/mpeg", "audio/mp3"}
@@ -40,12 +38,36 @@ async def create_exchange(
             detail="Session is not active",
         )
 
-    raw_content, suffix = await validate_audio_file(file)
+    if file.content_type not in ALLOWED_AUDIO_TYPES:
+        raise HTTPException(
+            status_code=HTTPStatus.UNSUPPORTED_MEDIA_TYPE,
+            detail=f"Invalid file type: {file.content_type}. Only WAV and MP3 files are allowed.",
+        )
+    if not file.filename:
+        raise HTTPException(status_code=400, detail="No filename provided")
 
-    whisper_result, whisper_ms = await run_transcription(raw_content, suffix)
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=HTTPStatus.UNPROCESSABLE_ENTITY, detail="Empty file uploaded")
+
+    suffix = pathlib.Path(file.filename).suffix
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(content)
+        tmp_path = tmp.name
+
+    t0 = time.time()
+    try:
+        whisper_result = await stt.transcribe(tmp_path)
+    finally:
+        os.unlink(tmp_path)
+
+    whisper_ms = int(round((time.time() - t0) * 1000))
 
     openrouter_client: OpenRouter = request.app.state.openrouter_client
-    analysis_result, analysis_ms = await run_analysis(whisper_result["raw_text"], openrouter_client)
+    t0 = time.time()
+    analysis_result = await analyze(whisper_result["raw_text"], openrouter_client)
+    analysis_ms = int(round((time.time() - t0) * 1000))
 
     exchange_id = uuid.uuid4()
     created_at = datetime.now(timezone.utc)
@@ -91,41 +113,3 @@ async def create_exchange(
         filename=file.filename or "",
         content_type=file.content_type,
     )
-
-
-async def validate_audio_file(file: UploadFile) -> tuple[bytes, str]:
-    if file.content_type not in ALLOWED_AUDIO_TYPES:
-        raise HTTPException(
-            status_code=HTTPStatus.UNSUPPORTED_MEDIA_TYPE,
-            detail=f"Invalid file type: {file.content_type}. Only WAV and MP3 files are allowed.",
-        )
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="No filename provided")
-
-    content = await file.read()
-    if not content:
-        raise HTTPException(status_code=HTTPStatus.UNPROCESSABLE_ENTITY, detail="Empty file uploaded")
-
-    return content, pathlib.Path(file.filename).suffix
-
-
-async def run_transcription(content: bytes, suffix: str) -> tuple[dict, int]:
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-        tmp.write(content)
-        tmp_path = tmp.name
-
-    t0 = time.time()
-    try:
-        result = await stt.transcribe(tmp_path)
-    finally:
-        os.unlink(tmp_path)
-
-    elapsed_ms = int(round((time.time() - t0) * 1000))
-    return result, elapsed_ms
-
-
-async def run_analysis(raw_text: str, openrouter_client: OpenRouter) -> tuple[dict, int]:
-    t0 = time.time()
-    result = await analyze(raw_text, openrouter_client)
-    elapsed_ms = int(round((time.time() - t0) * 1000))
-    return result, elapsed_ms
