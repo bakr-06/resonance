@@ -14,12 +14,12 @@ from db.models import AnalysisMetrics, Exchange, Session, TranscriptionMetrics
 from schemas.exchanges import ExchangeResponse
 from services import stt
 from services.ai_analysis import analyze
-from . import router
+from . import session_router
 
 ALLOWED_AUDIO_TYPES: set[str] = {"audio/wav", "audio/wave", "audio/mpeg", "audio/mp3"}
 
 
-@router.post("/sessions/{session_id}/exchanges", response_model=ExchangeResponse, status_code=HTTPStatus.CREATED)
+@session_router.post("/sessions/{session_id}/exchanges", response_model=ExchangeResponse, status_code=HTTPStatus.CREATED)
 async def create_exchange(
         session_id: uuid.UUID,
         request: Request,

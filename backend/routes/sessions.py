@@ -12,10 +12,10 @@ from schemas.exchanges import ExchangeResponse
 from schemas.sessions import CreateSessionResponse, SessionResponse
 from services.ai_analysis import generate_title
 
-from . import router
+from . import session_router
 
 
-@router.post("/sessions", response_model=CreateSessionResponse, status_code=HTTPStatus.CREATED)
+@session_router.post("/sessions", response_model=CreateSessionResponse, status_code=HTTPStatus.CREATED)
 async def create_session(
         db_session: DbSession,
 ) -> CreateSessionResponse:
@@ -31,7 +31,7 @@ async def create_session(
     )
 
 
-@router.get("/sessions", response_model=list[SessionResponse])
+@session_router.get("/sessions", response_model=list[SessionResponse])
 async def list_sessions(
         db_session: DbSession,
 ) -> list[SessionResponse]:
@@ -53,7 +53,7 @@ async def list_sessions(
     ]
 
 
-@router.get("/sessions/{session_id}", response_model=SessionResponse)
+@session_router.get("/sessions/{session_id}", response_model=SessionResponse)
 async def get_session(
         session_id: uuid.UUID,
         db_session: DbSession,
@@ -91,7 +91,7 @@ async def get_session(
     )
 
 
-@router.post("/sessions/{session_id}/end", response_model=SessionResponse)
+@session_router.post("/sessions/{session_id}/end", response_model=SessionResponse)
 async def end_session(
         session_id: uuid.UUID,
         request: Request,
@@ -147,7 +147,7 @@ async def end_session(
     )
 
 
-@router.delete("/sessions/{session_id}", status_code=HTTPStatus.NO_CONTENT)
+@session_router.delete("/sessions/{session_id}", status_code=HTTPStatus.NO_CONTENT)
 async def delete_session(
         session_id: uuid.UUID,
         db_session: DbSession,
