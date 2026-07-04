@@ -8,10 +8,12 @@ from http import HTTPStatus
 
 from fastapi import File, HTTPException, Request, UploadFile
 from openrouter import OpenRouter
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 
 from db.database import DbSession
 from db.models import AnalysisMetrics, Exchange, Session, TranscriptionMetrics
-from schemas.exchanges import ExchangeResponse
+from schemas.exchanges import ExchangeResponse, UpdateExchangeRequest
 from services import stt
 from services.ai_analysis import analyze
 from . import session_router
@@ -112,4 +114,67 @@ async def create_exchange(
         created_at=exchange.created_at.isoformat(),
         filename=file.filename or "",
         content_type=file.content_type,
+    )
+
+
+@session_router.put("/sessions/{session_id}/exchanges/{exchange_id}", response_model=ExchangeResponse)
+async def update_exchange(
+        session_id: uuid.UUID,
+        exchange_id: uuid.UUID,
+        request: Request,
+        db_session: DbSession,
+        body: UpdateExchangeRequest,
+) -> ExchangeResponse:
+    session = await db_session.get(Session, session_id)
+    if session is None:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND,
+            detail=f"Session {session_id} not found",
+        )
+    if not session.is_active:
+        raise HTTPException(
+            status_code=HTTPStatus.CONFLICT,
+            detail="Session is not active",
+        )
+
+    result = await db_session.execute(
+        select(Exchange)
+        .options(selectinload(Exchange.analysis_metrics))
+        .where(Exchange.id == exchange_id, Exchange.session_id == session_id)
+    )
+    exchange = result.scalar_one_or_none()
+    if exchange is None:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND,
+            detail=f"Exchange {exchange_id} not found in session {session_id}",
+        )
+
+    openrouter_client: OpenRouter = request.app.state.openrouter_client
+    t0 = time.time()
+    analysis_result = await analyze(body.transcript, openrouter_client)
+    analysis_ms = int(round((time.time() - t0) * 1000))
+
+    exchange.transcript = body.transcript
+    exchange.reflection = analysis_result["reflection"]
+    exchange.detected_mode = analysis_result["detected_mode"]
+
+    exchange.analysis_metrics.prompt_tokens = analysis_result["prompt_tokens"]
+    exchange.analysis_metrics.completion_tokens = analysis_result["completion_tokens"]
+    exchange.analysis_metrics.openrouter_request_id = analysis_result["request_id"]
+    exchange.analysis_metrics.model_used = analysis_result["model_used"]
+    exchange.analysis_metrics.created_at = datetime.fromtimestamp(
+        analysis_result["created_at"], tz=timezone.utc
+    )
+    exchange.analysis_metrics.processing_ms = analysis_ms
+
+    await db_session.commit()
+    await db_session.refresh(exchange)
+
+    return ExchangeResponse(
+        id=exchange.id,
+        session_id=exchange.session_id,
+        transcript=exchange.transcript,
+        reflection=exchange.reflection,
+        detected_mode=exchange.detected_mode,
+        created_at=exchange.created_at.isoformat(),
     )

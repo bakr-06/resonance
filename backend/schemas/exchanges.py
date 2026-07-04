@@ -3,6 +3,10 @@ import uuid
 from pydantic import BaseModel
 
 
+class UpdateExchangeRequest(BaseModel):
+    transcript: str
+
+
 class ExchangeResponse(BaseModel):
     id: uuid.UUID
     session_id: uuid.UUID
