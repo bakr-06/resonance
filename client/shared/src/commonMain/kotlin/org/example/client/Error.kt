@@ -1,3 +1,3 @@
-package com.example.sportify.core.domain
+package org.example.client
 
 interface Error

@@ -1,4 +1,4 @@
-package com.example.sportify.core.domain
+package org.example.client
 
 typealias RootError = Error
 
