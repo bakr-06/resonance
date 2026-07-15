@@ -6,8 +6,8 @@ import kotlinx.serialization.Serializable
 data class SessionDto(
     val id: String,
     val title: String? = null,
-    val created_at: String,
-    val ended_at: String? = null,
-    val is_active: Boolean,
+    val createdAt: String,
+    val endedAt: String? = null,
+    val isActive: Boolean,
     val exchanges: List<ExchangeDto> = emptyList(),
 )
