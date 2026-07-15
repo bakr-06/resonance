@@ -47,6 +47,7 @@ async def list_sessions(
             created_at=s.created_at.isoformat(),
             ended_at=s.ended_at.isoformat() if s.ended_at else None,
             is_active=s.is_active,
+            # TODO: Get rid of empty exchanges, they are a waste of memory
             exchanges=[],
         )
         for s in sessions
