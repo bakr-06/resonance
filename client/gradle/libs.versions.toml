@@ -13,6 +13,7 @@ composeMultiplatform = "1.11.1"
 junit = "4.13.2"
 kotlin = "2.4.0"
 kotlinx-coroutines = "1.11.0"
+kotlinx-serialization = "1.8.1"
 ktor = "3.5.1"
 material3 = "1.11.0-alpha07"
 
@@ -37,8 +38,11 @@ compose-uiToolingPreview = { module = "org.jetbrains.compose.ui:ui-tooling-previ
 kotlinx-coroutine-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutine-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutinesSwing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization" }
 ktor-client-core = { module = "io.ktor:ktor-client-core", version.ref = "ktor" }
 ktor-client-cio = { module = "io.ktor:ktor-client-cio", version.ref = "ktor" }
+ktor-client-content-negotiation = { module = "io.ktor:ktor-client-content-negotiation", version.ref = "ktor" }
+ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
@@ -47,3 +51,4 @@ composeMultiplatform = { id = "org.jetbrains.compose", version.ref = "composeMul
 composeCompiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlinJvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+kotlinSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
