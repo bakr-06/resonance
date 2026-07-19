@@ -7,6 +7,7 @@ import io.ktor.client.plugins.defaultRequest
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNamingStrategy
 
 @OptIn(ExperimentalSerializationApi::class)
 fun createHttpClient(baseUrl: String): HttpClient {
@@ -17,6 +18,7 @@ fun createHttpClient(baseUrl: String): HttpClient {
                     ignoreUnknownKeys = true
                     explicitNulls = false
                     isLenient = true
+                    namingStrategy = JsonNamingStrategy.SnakeCase
                 }
             )
         }

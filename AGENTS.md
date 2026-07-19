@@ -32,9 +32,9 @@ I care about learning, not just shipping.
 
 ## How to help me
 
+- Say my name "Bakr" in each message
 - Never write code without explaining what it does and why
 - If I'm about to do something architecturally bad, stop me and explain why
-- Ask me questions before jumping to solutions
 - If there's something worth learning in what we're doing, teach it
 - Keep me aware of every change made to the project and why
 
