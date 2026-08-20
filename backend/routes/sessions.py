@@ -54,7 +54,7 @@ async def list_sessions(
 
 
 @session_router.get("/sessions/{session_id}", response_model=SessionResponse)
-async def get_session(
+async def get_session_details(
         session_id: uuid.UUID,
         db_session: DbSession,
 ) -> SessionResponse:
