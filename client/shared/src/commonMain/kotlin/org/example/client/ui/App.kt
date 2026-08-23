@@ -25,6 +25,6 @@ fun App(
         val exchangeViewModel: ExchangeViewModel = viewModel {
             ExchangeViewModel(appDependencies.sessionsRepository)
         }
-        SessionsScreen(viewModel = exchangeViewModel)
+        SessionScreen(viewModel = exchangeViewModel)
     }
 }

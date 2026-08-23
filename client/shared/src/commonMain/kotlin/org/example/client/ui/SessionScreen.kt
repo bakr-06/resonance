@@ -13,7 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 
 @Composable
-fun SessionsScreen(
+fun SessionScreen(
     viewModel: ExchangeViewModel,
 ) {
     val uiState by viewModel.sessions.collectAsState()
