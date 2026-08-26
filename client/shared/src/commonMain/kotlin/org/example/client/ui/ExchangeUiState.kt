@@ -1,23 +1,15 @@
 package org.example.client.ui
 
-import kotlinx.datetime.Instant
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import org.example.client.data.network.NetworkError
 import org.example.client.data.network.dto.ExchangeDto
-import org.example.client.data.network.dto.SessionDto
+import kotlin.time.Instant
 
-data class SessionsUiState(
-    val sessions: List<SessionUi> = emptyList(),
-    val selectedSessionId: String? = null,
+data class ExchangeUiState(
     val exchanges: List<ExchangeUi> = emptyList(),
     val isLoadingDetails: Boolean = false,
     val errorMessage: String? = null,
-)
-
-data class SessionUi(
-    val id: String,
-    val title: String,
 )
 
 data class ExchangeUi(
@@ -25,11 +17,6 @@ data class ExchangeUi(
     val transcript: String,
     val reflection: String,
     val timestamp: String,
-)
-
-fun SessionDto.toSessionUi(): SessionUi = SessionUi(
-    id = id,
-    title = title ?: "Untitled session",
 )
 
 fun ExchangeDto.toExchangeUi(): ExchangeUi = ExchangeUi(
