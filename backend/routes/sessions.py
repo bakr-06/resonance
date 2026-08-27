@@ -53,6 +53,42 @@ async def list_sessions(
     ]
 
 
+@session_router.get("/sessions/active", response_model=SessionResponse | None)
+async def get_active_session(
+        db_session: DbSession,
+) -> SessionResponse | None:
+    result = await db_session.execute(
+        select(SessionModel)
+        .options(selectinload(SessionModel.exchanges))
+        .where(SessionModel.is_active == True)  # noqa: E712
+        .limit(1)
+    )
+
+    session: SessionModel | None = result.scalar_one_or_none()
+    if session is None:
+        return None
+
+    exchanges = sorted(session.exchanges, key=lambda e: e.created_at)
+    return SessionResponse(
+        id=session.id,
+        title=session.title,
+        created_at=session.created_at.isoformat(),
+        ended_at=session.ended_at.isoformat() if session.ended_at else None,
+        is_active=session.is_active,
+        exchanges=[
+            ExchangeResponse(
+                id=e.id,
+                session_id=e.session_id,
+                transcript=e.transcript,
+                reflection=e.reflection,
+                detected_mode=e.detected_mode,
+                created_at=e.created_at.isoformat(),
+            )
+            for e in exchanges
+        ],
+    )
+
+
 @session_router.get("/sessions/{session_id}", response_model=SessionResponse)
 async def get_session_details(
         session_id: uuid.UUID,

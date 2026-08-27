@@ -26,4 +26,22 @@ class SessionsRepository(
         } catch (exception: Exception) {
             Result.Error(NetworkError.NetworkFailure)
         }
+
+    suspend fun getActiveSession(): Result<SessionDto?, NetworkError> =
+        try {
+            Result.Success(sessionsApi.getActiveSession())
+        } catch (exception: ResponseException) {
+            Result.Error(NetworkError.HttpError(exception.response.status.value))
+        } catch (exception: Exception) {
+            Result.Error(NetworkError.NetworkFailure)
+        }
+
+    suspend fun createSession(): Result<SessionDto, NetworkError> =
+        try {
+            Result.Success(sessionsApi.createSession())
+        } catch (exception: ResponseException) {
+            Result.Error(NetworkError.HttpError(exception.response.status.value))
+        } catch (exception: Exception) {
+            Result.Error(NetworkError.NetworkFailure)
+        }
 }
