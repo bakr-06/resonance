@@ -7,7 +7,7 @@ import org.example.client.data.network.dto.ExchangeDto
 import kotlin.time.Instant
 
 data class ExchangeUiState(
-    val title: String? = null,
+    val title: String = "",
     val exchanges: List<ExchangeUi> = emptyList(),
     val isLoadingDetails: Boolean = false,
     val errorMessage: String? = null,

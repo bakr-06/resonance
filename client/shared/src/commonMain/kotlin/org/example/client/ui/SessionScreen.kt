@@ -24,13 +24,11 @@ fun SessionScreen(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        uiState.title?.let { title ->
-            Text(
-                text = title,
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                textAlign = TextAlign.Center,
-            )
-        }
+        Text(
+            text = uiState.title,
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            textAlign = TextAlign.Center,
+        )
 
         Box(
             modifier = Modifier.weight(1f).fillMaxWidth(),

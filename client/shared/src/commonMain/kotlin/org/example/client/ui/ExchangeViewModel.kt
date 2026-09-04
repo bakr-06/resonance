@@ -43,7 +43,7 @@ class ExchangeViewModel(
             }
 
             _uiState.value = _uiState.value.copy(
-                title = activeSession.title,
+                title = activeSession.title ?: "",
                 exchanges = activeSession.exchanges.map { it.toExchangeUi() },
                 isLoadingDetails = false,
             )
@@ -56,7 +56,7 @@ class ExchangeViewModel(
             when (val result = sessionsRepository.getSession(sessionId)) {
                 is Result.Success -> {
                     _uiState.value = _uiState.value.copy(
-                        title = result.data.title,
+                        title = result.data.title ?: "",
                         exchanges = result.data.exchanges.map { it.toExchangeUi() },
                         isLoadingDetails = false,
                     )
