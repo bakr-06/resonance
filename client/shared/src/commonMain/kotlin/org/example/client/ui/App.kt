@@ -23,7 +23,10 @@ fun App(
         LocalViewModelStoreOwner provides viewModelStoreOwner,
     ) {
         val exchangeViewModel: ExchangeViewModel = viewModel {
-            ExchangeViewModel(appDependencies.sessionsRepository)
+            ExchangeViewModel(
+                sessionsRepository = appDependencies.sessionsRepository,
+                recordAudioService = appDependencies.recordAudioService,
+            )
         }
         SessionScreen(viewModel = exchangeViewModel)
     }

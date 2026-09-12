@@ -11,7 +11,15 @@ data class ExchangeUiState(
     val exchanges: List<ExchangeUi> = emptyList(),
     val isLoadingDetails: Boolean = false,
     val errorMessage: String? = null,
+    val recordingStatus: RecordingStatus = RecordingStatus.Idle,
+    val activeSessionId: String? = null,
 )
+
+enum class RecordingStatus {
+    Idle,
+    Capturing,
+    Uploading,
+}
 
 data class ExchangeUi(
     val id: String,
@@ -20,6 +28,10 @@ data class ExchangeUi(
     val timestamp: String,
 )
 
+// TODO(recording): toExchangeUi() is a DTO→UI mapping function living inside the UI-state file.
+//  "Files are promises" — this file claims to define state, but it also owns mapping logic. If more
+//  mappings appear (session→UI, errors→messages), this file bloats. Fix when improving: extract
+//  mapping into a dedicated mapper (or each DTO's own toUi()). Kept here for now for brevity.
 fun ExchangeDto.toExchangeUi(): ExchangeUi = ExchangeUi(
     id = id,
     transcript = transcript,
@@ -35,6 +47,6 @@ fun String.toTimeHhMm(): String {
 }
 
 fun NetworkError.toErrorMessage(): String = when (this) {
-    is NetworkError.HttpError -> "Failed to load sessions (HTTP ${statusCode})"
+    is NetworkError.HttpError -> "Request failed (HTTP ${statusCode})"
     is NetworkError.NetworkFailure -> "Could not connect to the server"
 }

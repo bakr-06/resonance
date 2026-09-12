@@ -5,6 +5,7 @@ import org.example.client.data.network.createHttpClient
 
 class AppDependencies(
     val sessionsRepository: SessionsRepository,
+    val recordAudioService: RecordAudioService,
 )
 
 fun createAppDependencies(): AppDependencies {
@@ -15,5 +16,6 @@ fun createAppDependencies(): AppDependencies {
     )
     return AppDependencies(
         sessionsRepository = SessionsRepository(sessionsApi),
+        recordAudioService = RecordAudioService(),
     )
 }

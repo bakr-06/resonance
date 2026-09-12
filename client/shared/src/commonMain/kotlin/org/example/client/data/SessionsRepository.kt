@@ -4,7 +4,9 @@ import io.ktor.client.plugins.ResponseException
 import org.example.client.Result
 import org.example.client.data.network.NetworkError
 import org.example.client.data.network.SessionsApi
+import org.example.client.data.network.dto.ExchangeDto
 import org.example.client.data.network.dto.SessionDto
+import java.io.File
 
 class SessionsRepository(
     private val sessionsApi: SessionsApi,
@@ -39,6 +41,15 @@ class SessionsRepository(
     suspend fun createSession(): Result<SessionDto, NetworkError> =
         try {
             Result.Success(sessionsApi.createSession())
+        } catch (exception: ResponseException) {
+            Result.Error(NetworkError.HttpError(exception.response.status.value))
+        } catch (exception: Exception) {
+            Result.Error(NetworkError.NetworkFailure)
+        }
+
+    suspend fun createExchange(sessionId: String, audioFile: File): Result<ExchangeDto, NetworkError> =
+        try {
+            Result.Success(sessionsApi.createExchange(sessionId, audioFile))
         } catch (exception: ResponseException) {
             Result.Error(NetworkError.HttpError(exception.response.status.value))
         } catch (exception: Exception) {
