@@ -29,6 +29,9 @@ class SessionsApi(
     suspend fun createSession(): SessionDto =
         httpClient.post("$baseUrl/sessions").body()
 
+    suspend fun endSession(sessionId: String): SessionDto =
+        httpClient.post("$baseUrl/sessions/$sessionId/end").body()
+
     suspend fun createExchange(sessionId: String, audioFile: File): ExchangeDto {
         val audioBytes = audioFile.readBytes()
 

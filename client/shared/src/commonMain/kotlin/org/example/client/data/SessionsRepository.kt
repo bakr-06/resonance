@@ -47,6 +47,15 @@ class SessionsRepository(
             Result.Error(NetworkError.NetworkFailure)
         }
 
+    suspend fun endSession(sessionId: String): Result<SessionDto, NetworkError> =
+        try {
+            Result.Success(sessionsApi.endSession(sessionId))
+        } catch (exception: ResponseException) {
+            Result.Error(NetworkError.HttpError(exception.response.status.value))
+        } catch (exception: Exception) {
+            Result.Error(NetworkError.NetworkFailure)
+        }
+
     suspend fun createExchange(sessionId: String, audioFile: File): Result<ExchangeDto, NetworkError> =
         try {
             Result.Success(sessionsApi.createExchange(sessionId, audioFile))

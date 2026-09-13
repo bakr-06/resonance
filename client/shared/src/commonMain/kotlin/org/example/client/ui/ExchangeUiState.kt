@@ -13,6 +13,8 @@ data class ExchangeUiState(
     val errorMessage: String? = null,
     val recordingStatus: RecordingStatus = RecordingStatus.Idle,
     val activeSessionId: String? = null,
+    val isSessionEnded: Boolean = false,
+    val isEndingSession: Boolean = false,
 )
 
 enum class RecordingStatus {

@@ -75,6 +75,34 @@ class ExchangeViewModel internal constructor(
         }
     }
 
+    fun onEndSession() {
+        val sessionId = _uiState.value.activeSessionId ?: return
+        val recording = _uiState.value.recordingStatus
+        if (recording != RecordingStatus.Idle) return
+        val alreadyEnded = _uiState.value.isSessionEnded
+        val alreadyEnding = _uiState.value.isEndingSession
+        if (alreadyEnded || alreadyEnding) return
+
+        _uiState.value = _uiState.value.copy(isEndingSession = true)
+        viewModelScope.launch {
+            when (val result = sessionsRepository.endSession(sessionId)) {
+                is Result.Success -> {
+                    _uiState.value = _uiState.value.copy(
+                        isEndingSession = false,
+                        isSessionEnded = true,
+                    )
+                }
+
+                is Result.Error -> {
+                    _uiState.value = _uiState.value.copy(
+                        isEndingSession = false,
+                        errorMessage = result.error.toErrorMessage(),
+                    )
+                }
+            }
+        }
+    }
+
     private fun uploadRecording() {
         viewModelScope.launch {
             val sessionId = _uiState.value.activeSessionId
