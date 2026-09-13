@@ -1,19 +1,15 @@
 package org.example.client.ui
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -22,22 +18,38 @@ import androidx.compose.ui.unit.dp
 fun ExchangeChat(
     exchanges: List<ExchangeUi>,
 ) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        items(exchanges, key = { it.id }) { exchange ->
-            ExchangeBubble(
-                text = exchange.transcript,
-                timestamp = exchange.timestamp,
-                isUser = true,
-            )
-            ExchangeBubble(
-                text = exchange.reflection,
-                timestamp = exchange.timestamp,
-                isUser = false,
-            )
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(exchanges.size) {
+        if (exchanges.isNotEmpty()) {
+            listState.animateScrollToItem(exchanges.size * 2 - 1)
         }
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(exchanges, key = { it.id }) { exchange ->
+                ExchangeBubble(
+                    text = exchange.transcript,
+                    timestamp = exchange.timestamp,
+                    isUser = true,
+                )
+                ExchangeBubble(
+                    text = exchange.reflection,
+                    timestamp = exchange.timestamp,
+                    isUser = false,
+                )
+            }
+        }
+
+        LazyListScrollbar(
+            listState = listState,
+            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight(),
+        )
     }
 }
 
