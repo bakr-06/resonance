@@ -25,6 +25,7 @@ class ExchangeViewModel internal constructor(
             val session = when (val result = sessionsRepository.getActiveSession()) {
                 is Result.Success -> result.data
                 is Result.Error -> {
+                    println("VM init: failed to load active session (${result.error.toErrorMessage()})")
                     _uiState.value = _uiState.value.copy(
                         isLoadingDetails = false,
                         errorMessage = result.error.toErrorMessage(),
@@ -36,6 +37,7 @@ class ExchangeViewModel internal constructor(
             val activeSession = session ?: when (val result = sessionsRepository.createSession()) {
                 is Result.Success -> result.data
                 is Result.Error -> {
+                    println("VM init: failed to create a session (${result.error.toErrorMessage()})")
                     _uiState.value = _uiState.value.copy(
                         isLoadingDetails = false,
                         errorMessage = result.error.toErrorMessage(),
@@ -44,6 +46,8 @@ class ExchangeViewModel internal constructor(
                 }
             }
 
+            val source = if (session != null) "existing" else "newly created"
+            println("VM init: using $source session id=${activeSession.id}")
             _uiState.value = _uiState.value.copy(
                 title = activeSession.title ?: "",
                 exchanges = activeSession.exchanges.map { it.toExchangeUi() },
@@ -84,9 +88,11 @@ class ExchangeViewModel internal constructor(
         if (alreadyEnded || alreadyEnding) return
 
         _uiState.value = _uiState.value.copy(isEndingSession = true)
+        println("VM onEndSession: ending session id=$sessionId")
         viewModelScope.launch {
             when (val result = sessionsRepository.endSession(sessionId)) {
                 is Result.Success -> {
+                    println("VM onEndSession: session $sessionId ended (title=${result.data.title})")
                     _uiState.value = _uiState.value.copy(
                         isEndingSession = false,
                         isSessionEnded = true,
@@ -94,6 +100,7 @@ class ExchangeViewModel internal constructor(
                 }
 
                 is Result.Error -> {
+                    println("VM onEndSession: failed to end session $sessionId (${result.error.toErrorMessage()})")
                     _uiState.value = _uiState.value.copy(
                         isEndingSession = false,
                         errorMessage = result.error.toErrorMessage(),

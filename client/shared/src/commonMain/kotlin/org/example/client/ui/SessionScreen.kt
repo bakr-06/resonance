@@ -21,6 +21,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -32,8 +33,16 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun SessionScreen(
     viewModel: ExchangeViewModel,
+    onSessionEnded: (sessionId: String) -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
+
+    LaunchedEffect(uiState.isSessionEnded) {
+        val sessionId = uiState.activeSessionId
+        if (uiState.isSessionEnded && sessionId != null) {
+            onSessionEnded(sessionId)
+        }
+    }
 
     Column(
         modifier = Modifier.fillMaxSize(),
@@ -44,7 +53,7 @@ fun SessionScreen(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            IconButton(onClick = { /* TODO(menu): session history / settings — no navigation exists yet */ }) {
+            IconButton(onClick = { /* TODO(menu): session history / settings */ }) {
                 Icon(
                     imageVector = Icons.Default.Menu,
                     contentDescription = "Menu",

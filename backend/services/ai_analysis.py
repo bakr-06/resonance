@@ -1,9 +1,12 @@
 import json
+import logging
 import re
 
 from typing import TypedDict
 
 from openrouter import OpenRouter
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT: str = """You are a quiet, perceptive reflection tool. Your job is not to fix, advise, or judge. Your only job is to make the user feel understood and to gently surface what they might not have fully said yet.
 
@@ -57,7 +60,8 @@ async def analyze(message: str, client: OpenRouter) -> AnalysisResult:
         parsed = json.loads(content)
         reflection = parsed.get("reflection", "")
         mode = parsed.get("mode", "")
-    except (json.JSONDecodeError, AttributeError):
+    except (json.JSONDecodeError, AttributeError) as exc:
+        logger.warning("Failed to parse LLM reflection JSON: %s", exc)
         reflection = ""
         mode = ""
 

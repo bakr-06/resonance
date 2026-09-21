@@ -1,3 +1,4 @@
+import logging
 import uuid
 from datetime import datetime, timezone
 from http import HTTPStatus
@@ -14,6 +15,8 @@ from services.ai_analysis import generate_title
 
 from . import session_router
 
+logger = logging.getLogger(__name__)
+
 
 @session_router.post("/sessions", response_model=CreateSessionResponse, status_code=HTTPStatus.CREATED)
 async def create_session(
@@ -23,6 +26,7 @@ async def create_session(
     db_session.add(session)
     await db_session.commit()
     await db_session.refresh(session)
+    logger.info("Created session id=%s", session.id)
     return CreateSessionResponse(
         id=session.id,
         title=session.title,
@@ -150,17 +154,23 @@ async def end_session(
             detail="Session is already ended",
         )
 
+    logger.info("Ending session id=%s with %d exchanges", session_id, len(session.exchanges))
+
     session.is_active = False
     session.ended_at = datetime.now(timezone.utc)
 
     transcripts = [e.transcript for e in session.exchanges]
     if transcripts:
+        logger.info("Generating title for session id=%s from %d transcripts", session_id, len(transcripts))
         openrouter_client = request.app.state.openrouter_client
         title = await generate_title(transcripts, openrouter_client)
         session.title = title
+    else:
+        logger.info("Session id=%s has no transcripts, skipping title generation", session_id)
 
     await db_session.commit()
     await db_session.refresh(session)
+    logger.info("Session id=%s ended (title=%r)", session_id, session.title)
 
     exchanges = sorted(session.exchanges, key=lambda e: e.created_at)
     return SessionResponse(

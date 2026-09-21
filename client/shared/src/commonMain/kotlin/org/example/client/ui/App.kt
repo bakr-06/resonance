@@ -1,33 +1,53 @@
 package org.example.client.ui
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.remember
-import androidx.lifecycle.ViewModelStore
-import androidx.lifecycle.ViewModelStoreOwner
-import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import org.example.client.data.AppDependencies
 
 @Composable
 fun App(
     appDependencies: AppDependencies,
 ) {
-    val viewModelStoreOwner = remember {
-        object : ViewModelStoreOwner {
-            override val viewModelStore: ViewModelStore = ViewModelStore()
-        }
-    }
+    val navController = rememberNavController()
 
-    CompositionLocalProvider(
-        LocalViewModelStoreOwner provides viewModelStoreOwner,
+    NavHost(
+        navController = navController,
+        startDestination = SessionDestination,
     ) {
-        val exchangeViewModel: ExchangeViewModel = viewModel {
-            ExchangeViewModel(
-                sessionsRepository = appDependencies.sessionsRepository,
-                recordAudioService = appDependencies.recordAudioService,
+        composable<SessionDestination> {
+            val exchangeViewModel: ExchangeViewModel = viewModel {
+                ExchangeViewModel(
+                    sessionsRepository = appDependencies.sessionsRepository,
+                    recordAudioService = appDependencies.recordAudioService,
+                )
+            }
+
+            SessionScreen(
+                viewModel = exchangeViewModel,
+                onSessionEnded = { sessionId ->
+                    println("Navigation: session ended -> Session Summary (sessionId=$sessionId)")
+                    navController.navigate(SessionSummaryDestination(sessionId)) {
+                        popUpTo<SessionDestination> { inclusive = true }
+                    }
+                },
             )
         }
-        SessionScreen(viewModel = exchangeViewModel)
+
+        composable<SessionSummaryDestination> { backStackEntry ->
+            val destination = backStackEntry.toRoute<SessionSummaryDestination>()
+            SessionSummaryScreen(
+                sessionId = destination.sessionId,
+                onStartNewSession = {
+                    println("Navigation: starting a new session")
+                    navController.navigate(SessionDestination) {
+                        popUpTo<SessionSummaryDestination> { inclusive = true }
+                    }
+                },
+            )
+        }
     }
 }
