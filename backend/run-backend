@@ -1,0 +1,2 @@
+#!/bin/bash
+/home/bakr/code/assistant/resonance/backend/.venv/bin/python -m fastapi dev /home/bakr/code/assistant/resonance/backend/main.py
