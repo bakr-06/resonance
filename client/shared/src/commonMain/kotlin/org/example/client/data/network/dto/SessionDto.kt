@@ -8,8 +8,7 @@ data class SessionDto(
     val id: String,
     val title: String?,
     @SerialName("created_at") val createdAt: String,
-    @SerialName("ended_at") val endedAt: String? =  null,
+    @SerialName("ended_at") val endedAt: String? = null,
     @SerialName("is_active") val isActive: Boolean,
-     wq
     val exchanges: List<ExchangeDto> = emptyList(),
 )

@@ -1,13 +1,12 @@
 package org.example.client.data
 
-import io.ktor.client.plugins.ResponseException
+import io.ktor.client.plugins.*
 import org.example.client.Result
 import org.example.client.data.network.NetworkError
 import org.example.client.data.network.SessionsApi
 import org.example.client.data.network.dto.ExchangeDto
 import org.example.client.data.network.dto.SessionDto
 import java.io.File
-import kotlin.math.exp
 
 class SessionsRepository(
     private val sessionsApi: SessionsApi,
