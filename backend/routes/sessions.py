@@ -12,7 +12,6 @@ from db.models import Session as SessionModel
 from schemas.exchanges import ExchangeResponse
 from schemas.sessions import CreateSessionResponse, SessionResponse
 from services.ai_analysis import generate_title
-
 from . import session_router
 
 logger = logging.getLogger(__name__)

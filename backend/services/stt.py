@@ -34,10 +34,11 @@ async def transcribe(audio_path: str) -> TranscribeResult:
         }
         for s in result.get("segments", [])
     ]
+    duration_ms: int = round(segments[-1]["end"] * 1000) if segments else 0
     return TranscribeResult(
         raw_text=result["text"],
-        detected_language=result["language"],
+        detected_language=result.get("language"),
         segments=segments,
-        duration_ms=(result["segments"][-1]["end"]) * 1000,
+        duration_ms=duration_ms,
         created_at=datetime.now()
     )

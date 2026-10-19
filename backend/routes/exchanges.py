@@ -64,6 +64,12 @@ async def create_exchange(
     finally:
         os.unlink(tmp_path)
 
+    if not whisper_result["raw_text"].strip():
+        raise HTTPException(
+            status_code=HTTPStatus.UNPROCESSABLE_ENTITY,
+            detail="No speech detected in the uploaded audio",
+        )
+
     whisper_ms = int(round((time.time() - t0) * 1000))
 
     openrouter_client: OpenRouter = request.app.state.openrouter_client
