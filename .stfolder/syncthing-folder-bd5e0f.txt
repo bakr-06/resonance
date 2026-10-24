@@ -1,0 +1,10 @@
+# This directory is a Syncthing folder marker.
+# Do not delete.
+
+folderID: 52tdq-mwrgy
+created: 2026-10-21T09:37:05+03:00
+
+(?d).idea/workspace.xml
+(?d).idea/tasks.xml
+(?d).idea/usage.statistics.xml
+(?d).idea/shelf/

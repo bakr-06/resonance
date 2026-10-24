@@ -7,7 +7,6 @@ from datetime import datetime, timezone
 from http import HTTPStatus
 
 from fastapi import File, HTTPException, Request, UploadFile
-from openrouter import OpenRouter
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
@@ -72,9 +71,14 @@ async def create_exchange(
 
     whisper_ms = int(round((time.time() - t0) * 1000))
 
-    openrouter_client: OpenRouter = request.app.state.openrouter_client
+    http_client = request.app.state.http_client
+    ollama_base_url = request.app.state.ollama_base_url
+    ollama_model = request.app.state.ollama_model
+    ollama_num_ctx = request.app.state.ollama_num_ctx
     t0 = time.time()
-    analysis_result = await analyze(whisper_result["raw_text"], openrouter_client)
+    analysis_result = await analyze(
+        whisper_result["raw_text"], http_client, ollama_base_url, ollama_model, ollama_num_ctx
+    )
     analysis_ms = int(round((time.time() - t0) * 1000))
 
     exchange_id = uuid.uuid4()
@@ -97,7 +101,7 @@ async def create_exchange(
         analysis_metrics=AnalysisMetrics(
             prompt_tokens=analysis_result["prompt_tokens"],
             completion_tokens=analysis_result["completion_tokens"],
-            openrouter_request_id=analysis_result["request_id"],
+            request_id=analysis_result["request_id"],
             model_used=analysis_result["model_used"],
             created_at=datetime.fromtimestamp(analysis_result["created_at"], tz=timezone.utc),
             processing_ms=analysis_ms,
@@ -155,9 +159,14 @@ async def update_exchange(
             detail=f"Exchange {exchange_id} not found in session {session_id}",
         )
 
-    openrouter_client: OpenRouter = request.app.state.openrouter_client
+    http_client = request.app.state.http_client
+    ollama_base_url = request.app.state.ollama_base_url
+    ollama_model = request.app.state.ollama_model
+    ollama_num_ctx = request.app.state.ollama_num_ctx
     t0 = time.time()
-    analysis_result = await analyze(body.transcript, openrouter_client)
+    analysis_result = await analyze(
+        body.transcript, http_client, ollama_base_url, ollama_model, ollama_num_ctx
+    )
     analysis_ms = int(round((time.time() - t0) * 1000))
 
     exchange.transcript = body.transcript
@@ -166,7 +175,7 @@ async def update_exchange(
 
     exchange.analysis_metrics.prompt_tokens = analysis_result["prompt_tokens"]
     exchange.analysis_metrics.completion_tokens = analysis_result["completion_tokens"]
-    exchange.analysis_metrics.openrouter_request_id = analysis_result["request_id"]
+    exchange.analysis_metrics.request_id = analysis_result["request_id"]
     exchange.analysis_metrics.model_used = analysis_result["model_used"]
     exchange.analysis_metrics.created_at = datetime.fromtimestamp(
         analysis_result["created_at"], tz=timezone.utc

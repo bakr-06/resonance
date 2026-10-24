@@ -2,7 +2,6 @@ fastapi[standard]
 uvicorn
 python-multipart
 openai-whisper
-openrouter
 python-dotenv
 pydantic-settings
 httpx

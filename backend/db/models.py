@@ -72,7 +72,7 @@ class AnalysisMetrics(Base):
     )
     prompt_tokens: Mapped[int] = mapped_column(Integer)
     completion_tokens: Mapped[int] = mapped_column(Integer)
-    openrouter_request_id: Mapped[str] = mapped_column(String)
+    request_id: Mapped[str] = mapped_column(String)
     model_used: Mapped[str] = mapped_column(String)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     processing_ms: Mapped[int] = mapped_column(Integer)

@@ -162,9 +162,17 @@ async def end_session(
     transcripts = [e.transcript for e in session.exchanges]
     if transcripts:
         logger.info("Generating title for session id=%s from %d transcripts", session_id, len(transcripts))
-        openrouter_client = request.app.state.openrouter_client
-        title = await generate_title(transcripts, openrouter_client)
-        session.title = title
+        http_client = request.app.state.http_client
+        ollama_base_url = request.app.state.ollama_base_url
+        ollama_model = request.app.state.ollama_model
+        ollama_num_ctx = request.app.state.ollama_num_ctx
+        title = await generate_title(
+            transcripts, http_client, ollama_base_url, ollama_model, ollama_num_ctx
+        )
+        if title:
+            session.title = title
+        else:
+            logger.warning("Title generation returned empty for session id=%s", session_id)
     else:
         logger.info("Session id=%s has no transcripts, skipping title generation", session_id)
 

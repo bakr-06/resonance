@@ -1,10 +1,11 @@
 import json
 import logging
 import re
-
+import time
+from datetime import datetime
 from typing import TypedDict
 
-from openrouter import OpenRouter
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -23,47 +24,22 @@ How to respond:
 - Sit with what they said. Respond to what's underneath it, not the surface.
 - End with one quiet question that was already living inside what they said. Not a new direction. Not a therapy question. Just the thread they were already pulling on, named quietly. If no question feels right, don't ask one.
 
-Respond only in JSON with exactly two fields:
-- "mode": one of "venting", "clarity", or "heard"
-- "reflection": your full response text
-
-No preamble, no markdown, no backticks. Just raw JSON."""
-
-# SYSTEM_PROMPT: str = """You are my best friend who is the same age as me and understands me.
-# Make sure u say my name 'Bakr' in every answer, dont talk to me like a bot and dont treat me like a patient,
-# I dont want self help answers. be casual and conversational.
-# i want u to listen to me and make me feel understood.
-# dont use lists or bullet points, instead answer like we are chatting together.
-# dont assume details, if u dont understand something ask me for detail.
-# I like teasing and banter, so use them a lot. Dont worry I can take a joke. Answer in english.
-# Respond only in JSON with exactly two fields:
-# - "mode": one of "venting", "clarity", or "heard"
-# - "reflection": your full response text
-#
-# No preamble, no markdown, no backticks. Just raw JSON.
-# """
-# SYSTEM_PROMPT: str = """You are a quiet, perceptive reflection tool. Your job is not to fix, advise, or judge. Your only job is to make the user feel understood and to gently surface what they might not have fully said yet.
-#
-# First, read the tone. Is the user venting, seeking clarity, or just needing to be heard? Respond accordingly.
-#
-# For venting: receive it fully, reflect it back accurately, make them feel seen.
-# For clarity seeking: help them name what they're feeling without putting words in their mouth.
-# For needing to be heard: acknowledge it simply and warmly without over-analyzing.
-#
-# End with one single gentle question that was already living inside what they said. Not a new direction. Not a therapy question. Just the thread they were already pulling on, named quietly.
-# If the question doesn't feel right, don't ask it. Silence is better than the wrong question.
-#
-# Never use clinical language. Never say "it sounds like" or "I hear that". Speak like a perceptive human, not a chatbot.
-#
-# Respond only in JSON with exactly two fields:
-# - "mode": one of "venting", "clarity", or "heard"
-# - "reflection": your full response text
-#
-# No preamble, no markdown, no backticks. Just raw JSON."""
+You MUST respond ONLY with valid JSON matching this exact schema with no extra text, markdown, or code fences:
+{
+  "mode": "venting" | "clarity" | "heard",
+  "reflection": "string"
+}"""
 
 TITLE_PROMPT: str = """Generate a short, meaningful title (maximum 6 words) for a journaling session based on these journal entries. The title should capture the main theme or feeling of the session.
 
 Respond only with the title text — no quotes, no explanations, no punctuation beyond what's in the title itself."""
+
+ANALYSIS_TEMPERATURE: float = 0.4
+TITLE_TEMPERATURE: float = 0.3
+
+# Roughly 4 characters per token. Reserved for the system prompt and reply.
+CHARS_PER_TOKEN: int = 4
+PROMPT_TOKEN_RESERVE: int = 1000
 
 
 class AnalysisResult(TypedDict):
@@ -76,48 +52,224 @@ class AnalysisResult(TypedDict):
     created_at: int
 
 
-async def analyze(message: str, client: OpenRouter) -> AnalysisResult:
-    response = await client.chat.send_async(
-        model="openrouter/free",
-        messages=[
-            {"role": "user", "content": message},
-            {"role": "system", "content": SYSTEM_PROMPT},
-        ],
-    )
+def _normalize_mode(mode: str | None) -> str | None:
+    """Map model output onto the three modes we accept, or None if it made one up."""
+    if not mode:
+        return None
+    m: str = str(mode).strip().lower().replace(" ", "").replace("-", "")
+    if m == "venting":
+        return "venting"
+    if m == "clarity":
+        return "clarity"
+    if m in ("heard", "heared", "hear", "hearing"):
+        return "heard"
+    return None
 
-    content = response.choices[0].message.content
-    print({"raw_content": content})
-    # Check this when you change the model in openrouter
+
+def _extract_json_object(content: str) -> str:
+    """Strip code fences and surrounding prose, leaving the JSON object."""
+    content = content.strip()
     content = re.sub(r"```(?:json)?\s*|\s*```", "", content).strip()
+    if content.startswith("{") and content.endswith("}"):
+        return content
+    match = re.search(r"\{.*\}", content, re.DOTALL)
+    if match:
+        return match.group(0)
+    return content
 
+
+def _parse_created_at(raw: str | None) -> int:
+    """Ollama returns an ISO-8601 timestamp; our DB stores a unix timestamp."""
+    if not raw:
+        return int(time.time())
     try:
-        parsed = json.loads(content)
-        reflection = parsed.get("reflection", "")
-        mode = parsed.get("mode", "")
-    except (json.JSONDecodeError, AttributeError) as exc:
-        logger.warning("Failed to parse LLM reflection JSON: %s", exc)
-        reflection = ""
-        mode = ""
-
-    return AnalysisResult(
-        reflection=reflection,
-        detected_mode=mode,
-        model_used=response.model,
-        prompt_tokens=response.usage.prompt_tokens,
-        completion_tokens=response.usage.completion_tokens,
-        request_id=response.id,
-        created_at=response.created)
+        return int(datetime.fromisoformat(raw.replace("Z", "+00:00")).timestamp())
+    except (ValueError, AttributeError):
+        return int(time.time())
 
 
-async def generate_title(transcripts: list[str], client: OpenRouter) -> str:
-    combined = "\n\n".join(transcripts)
-    response = await client.chat.send_async(
-        model="openrouter/free",
-        messages=[
-            {"role": "user", "content": f"Journal entries:\n\n{combined}"},
-            {"role": "system", "content": TITLE_PROMPT},
-        ],
+def _max_chars(num_ctx: int) -> int:
+    return (num_ctx - PROMPT_TOKEN_RESERVE) * CHARS_PER_TOKEN
+
+
+def _fit_text(text: str, num_ctx: int) -> str:
+    """Keep the start and end of over-long text so a long entry is not silently cut off."""
+    limit: int = _max_chars(num_ctx)
+    if len(text) <= limit:
+        return text
+    head_length: int = limit * 2 // 3
+    tail_length: int = limit - head_length
+    logger.warning(
+        "Input truncated from %d to %d characters to fit the model context (%d tokens)",
+        len(text),
+        limit,
+        num_ctx,
     )
-    title = response.choices[0].message.content.strip()
-    title = re.sub(r'^["\']|["\']$', "", title)
-    return title
+    return text[:head_length] + "\n\n[...]\n\n" + text[-tail_length:]
+
+
+async def _chat(
+        http_client: httpx.AsyncClient,
+        base_url: str,
+        model: str,
+        num_ctx: int,
+        messages: list[dict[str, str]],
+        temperature: float,
+        force_json: bool,
+        num_predict: int | None = None,
+) -> dict:
+    """Call Ollama's native /api/chat, which (unlike /v1) honours num_ctx."""
+    options: dict[str, float | int] = {
+        "num_ctx": num_ctx,
+        "temperature": temperature,
+    }
+    if num_predict is not None:
+        options["num_predict"] = num_predict
+
+    body: dict[str, object] = {
+        "model": model,
+        "messages": messages,
+        "stream": False,
+        "options": options,
+    }
+    if force_json:
+        body["format"] = "json"
+
+    response = await http_client.post(f"{base_url}/api/chat", json=body)
+    response.raise_for_status()
+    return response.json()
+
+
+def _empty_result(model: str) -> AnalysisResult:
+    return AnalysisResult(
+        reflection="",
+        detected_mode=None,
+        model_used=model,
+        prompt_tokens=0,
+        completion_tokens=0,
+        request_id="",
+        created_at=int(time.time()),
+    )
+
+
+async def analyze(
+        message: str,
+        http_client: httpx.AsyncClient,
+        base_url: str,
+        model: str,
+        num_ctx: int,
+) -> AnalysisResult:
+    try:
+        data = await _chat(
+            http_client=http_client,
+            base_url=base_url,
+            model=model,
+            num_ctx=num_ctx,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
+                {"role": "user", "content": _fit_text(message, num_ctx)},
+            ],
+            temperature=ANALYSIS_TEMPERATURE,
+            force_json=True,
+        )
+
+        content: str = data["message"]["content"]
+        logger.debug("Raw analysis content: %s", content)
+        content = _extract_json_object(content)
+
+        reflection: str = ""
+        mode: str | None = None
+        try:
+            parsed = json.loads(content)
+            if isinstance(parsed, dict):
+                reflection = parsed.get("reflection", "") or ""
+                mode = _normalize_mode(parsed.get("mode"))
+        except (json.JSONDecodeError, AttributeError) as exc:
+            logger.warning("Failed to parse LLM reflection JSON: %s", exc)
+            try:
+                reflection_match = re.search(
+                    r'"reflection"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"', content
+                )
+                if reflection_match:
+                    reflection = reflection_match.group(1).encode("utf-8").decode("unicode_escape")
+                mode_match = re.search(r'"mode"\s*:\s*"([^"]+)"', content, re.IGNORECASE)
+                if mode_match:
+                    mode = _normalize_mode(mode_match.group(1))
+            except Exception:
+                pass
+
+        if not reflection.strip():
+            logger.warning("Ollama returned an empty reflection for model %r", model)
+
+        return AnalysisResult(
+            reflection=reflection,
+            detected_mode=mode,
+            model_used=data.get("model", model),
+            prompt_tokens=data.get("prompt_eval_count", 0),
+            completion_tokens=data.get("eval_count", 0),
+            request_id="",
+            created_at=_parse_created_at(data.get("created_at")),
+        )
+    except httpx.TimeoutException:
+        logger.warning(
+            "Ollama analysis timed out. Local inference may be slower than "
+            "OLLAMA_TIMEOUT_SECONDS; raise it if this keeps happening."
+        )
+        return _empty_result(model)
+    except httpx.HTTPStatusError as exc:
+        logger.warning(
+            "Ollama analysis HTTP error: %s %s",
+            exc.response.status_code,
+            exc.response.text[:200],
+        )
+        return _empty_result(model)
+    except Exception as exc:
+        logger.warning("Ollama analysis failed: %s", exc)
+        return _empty_result(model)
+
+
+async def generate_title(
+        transcripts: list[str],
+        http_client: httpx.AsyncClient,
+        base_url: str,
+        model: str,
+        num_ctx: int,
+) -> str:
+    try:
+        combined: str = _fit_text("\n\n".join(transcripts), num_ctx)
+        data = await _chat(
+            http_client=http_client,
+            base_url=base_url,
+            model=model,
+            num_ctx=num_ctx,
+            messages=[
+                {"role": "system", "content": TITLE_PROMPT},
+                {"role": "user", "content": f"Journal entries:\n\n{combined}"},
+            ],
+            temperature=TITLE_TEMPERATURE,
+            force_json=False,
+        )
+
+        content: str = data["message"]["content"].strip()
+        content = re.sub(r"```(?:json)?\s*|\s*```", "", content).strip()
+        lines: list[str] = [line.strip() for line in content.splitlines() if line.strip()]
+        title: str = lines[0] if lines else content
+        title = re.sub(r'^["\']|["\']$', "", title)
+        title = re.sub(r"^[\-*•]+\s*", "", title)
+        return title.strip()[:80]
+    except httpx.TimeoutException:
+        logger.warning(
+            "Ollama title generation timed out. Local inference may be slower than "
+            "OLLAMA_TIMEOUT_SECONDS; raise it if this keeps happening."
+        )
+        return ""
+    except httpx.HTTPStatusError as exc:
+        logger.warning(
+            "Ollama title generation HTTP error: %s %s",
+            exc.response.status_code,
+            exc.response.text[:200],
+        )
+        return ""
+    except Exception as exc:
+        logger.warning("Ollama title generation failed: %s", exc)
+        return ""
