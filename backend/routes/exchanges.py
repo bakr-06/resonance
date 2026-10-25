@@ -15,6 +15,7 @@ from db.models import AnalysisMetrics, Exchange, Session, TranscriptionMetrics
 from schemas.exchanges import ExchangeResponse, UpdateExchangeRequest
 from services import stt
 from services.ai_analysis import analyze
+from services.context_window import context_window_cache
 from . import session_router
 
 ALLOWED_AUDIO_TYPES: set[str] = {"audio/wav", "audio/wave", "audio/mpeg", "audio/mp3"}
@@ -71,13 +72,20 @@ async def create_exchange(
 
     whisper_ms = int(round((time.time() - t0) * 1000))
 
+    context: list[str] = await context_window_cache.get_transcripts(session_id, db_session)
+
     http_client = request.app.state.http_client
     ollama_base_url = request.app.state.ollama_base_url
     ollama_model = request.app.state.ollama_model
     ollama_num_ctx = request.app.state.ollama_num_ctx
     t0 = time.time()
     analysis_result = await analyze(
-        whisper_result["raw_text"], http_client, ollama_base_url, ollama_model, ollama_num_ctx
+        whisper_result["raw_text"],
+        context,
+        http_client,
+        ollama_base_url,
+        ollama_model,
+        ollama_num_ctx,
     )
     analysis_ms = int(round((time.time() - t0) * 1000))
 
@@ -114,6 +122,12 @@ async def create_exchange(
 
     await db_session.commit()
     await db_session.refresh(exchange)
+    await context_window_cache.append(
+        session_id=session_id,
+        exchange_id=exchange.id,
+        transcript=exchange.transcript,
+        created_at=exchange.created_at,
+    )
 
     return ExchangeResponse(
         id=exchange.id,
@@ -159,13 +173,22 @@ async def update_exchange(
             detail=f"Exchange {exchange_id} not found in session {session_id}",
         )
 
+    context: list[str] = await context_window_cache.get_transcripts(
+        session_id, db_session, exclude_exchange_id=exchange_id
+    )
+
     http_client = request.app.state.http_client
     ollama_base_url = request.app.state.ollama_base_url
     ollama_model = request.app.state.ollama_model
     ollama_num_ctx = request.app.state.ollama_num_ctx
     t0 = time.time()
     analysis_result = await analyze(
-        body.transcript, http_client, ollama_base_url, ollama_model, ollama_num_ctx
+        body.transcript,
+        context,
+        http_client,
+        ollama_base_url,
+        ollama_model,
+        ollama_num_ctx,
     )
     analysis_ms = int(round((time.time() - t0) * 1000))
 
@@ -184,6 +207,11 @@ async def update_exchange(
 
     await db_session.commit()
     await db_session.refresh(exchange)
+    await context_window_cache.update_transcript(
+        session_id=session_id,
+        exchange_id=exchange_id,
+        transcript=exchange.transcript,
+    )
 
     return ExchangeResponse(
         id=exchange.id,

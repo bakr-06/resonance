@@ -108,6 +108,24 @@ def _fit_text(text: str, num_ctx: int) -> str:
     return text[:head_length] + "\n\n[...]\n\n" + text[-tail_length:]
 
 
+def _build_user_content(message: str, context: list[str]) -> str:
+    """Put earlier exchanges before the current one without asking for a reply to them."""
+    if not context:
+        return message
+
+    entries: str = "\n\n".join(
+        f"Earlier entry {index}:\n{transcript}"
+        for index, transcript in enumerate(context, start=1)
+    )
+    return (
+        "Earlier entries from this session, oldest first. "
+        "Use them only as context; respond to the current entry.\n\n"
+        f"{entries}\n\n---\n\n"
+        "Current entry:\n"
+        f"{message}"
+    )
+
+
 async def _chat(
         http_client: httpx.AsyncClient,
         base_url: str,
@@ -154,6 +172,7 @@ def _empty_result(model: str) -> AnalysisResult:
 
 async def analyze(
         message: str,
+        context: list[str],
         http_client: httpx.AsyncClient,
         base_url: str,
         model: str,
@@ -167,7 +186,10 @@ async def analyze(
             num_ctx=num_ctx,
             messages=[
                 {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": _fit_text(message, num_ctx)},
+                {
+                    "role": "user",
+                    "content": _fit_text(_build_user_content(message, context), num_ctx),
+                },
             ],
             temperature=ANALYSIS_TEMPERATURE,
             force_json=True,
