@@ -12,6 +12,7 @@ from db.models import Session as SessionModel
 from schemas.exchanges import ExchangeResponse
 from schemas.sessions import CreateSessionResponse, SessionResponse
 from services.ai_analysis import generate_title
+from services.context_window import context_window_cache
 from . import session_router
 
 logger = logging.getLogger(__name__)
@@ -178,6 +179,7 @@ async def end_session(
 
     await db_session.commit()
     await db_session.refresh(session)
+    await context_window_cache.clear(session_id)
     logger.info("Session id=%s ended (title=%r)", session_id, session.title)
 
     exchanges = sorted(session.exchanges, key=lambda e: e.created_at)
@@ -215,5 +217,6 @@ async def delete_session(
 
     await db_session.delete(session)
     await db_session.commit()
+    await context_window_cache.clear(session_id)
 
     return Response(status_code=HTTPStatus.NO_CONTENT)
