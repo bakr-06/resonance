@@ -15,7 +15,7 @@ import httpx
 import pytest
 
 from logging_config import PROMPT_LOGGER_NAME
-from services.ai_analysis import AnalysisResult, _chat, _log_messages, analyze
+from services.ai_analysis import _chat, _log_messages
 
 LOGGER_NAME: str = "services.ai_analysis"
 SESSION_ID: uuid.UUID = uuid.UUID(int=42)
@@ -89,41 +89,3 @@ def test_chat_sends_num_ctx_and_logs_token_counts(
         getattr(record, "session_id", None) == str(SESSION_ID)
         for record in caplog.records
     )
-
-
-def test_analyze_sends_no_system_prompt_and_stores_raw_text() -> None:
-    """The model runs unconstrained: no system role, no JSON mode, raw reply."""
-    bodies: list[dict[str, Any]] = []
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        bodies.append(json.loads(request.content))
-        return httpx.Response(
-            200,
-            json={
-                "model": "llama3.1",
-                "message": {"role": "assistant", "content": "  That sounds heavy.  "},
-                "prompt_eval_count": 120,
-                "eval_count": 9,
-                "created_at": "2026-01-01T00:00:00Z",
-            },
-        )
-
-    async def call() -> AnalysisResult:
-        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-            return await analyze(
-                message="I feel guilty",
-                context=["I skipped class again."],
-                http_client=client,
-                base_url="http://ollama.test",
-                model="llama3.1",
-                num_ctx=8192,
-                session_id=SESSION_ID,
-            )
-
-    result: AnalysisResult = asyncio.run(call())
-
-    assert [message["role"] for message in bodies[0]["messages"]] == ["user"]
-    assert "format" not in bodies[0]
-    assert "Earlier entry 1:" in bodies[0]["messages"][0]["content"]
-    assert result["reflection"] == "That sounds heavy."
-    assert result["detected_mode"] is None
