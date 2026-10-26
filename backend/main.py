@@ -7,9 +7,12 @@ from fastapi import FastAPI
 
 from config import settings
 from db.database import engine
+from logging_config import configure_logging
 from routes import session_router
 
 logger = logging.getLogger(__name__)
+
+configure_logging(settings.log_level)
 
 
 async def _check_ollama_model(

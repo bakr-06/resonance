@@ -86,6 +86,7 @@ async def create_exchange(
         ollama_base_url,
         ollama_model,
         ollama_num_ctx,
+        session_id=session_id,
     )
     analysis_ms = int(round((time.time() - t0) * 1000))
 
@@ -189,6 +190,7 @@ async def update_exchange(
         ollama_base_url,
         ollama_model,
         ollama_num_ctx,
+        session_id=session_id,
     )
     analysis_ms = int(round((time.time() - t0) * 1000))
 

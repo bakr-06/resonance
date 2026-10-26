@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 
 from db.database import DbSession
 from db.models import Session as SessionModel
+from logging_config import session_log_extra
 from schemas.exchanges import ExchangeResponse
 from schemas.sessions import CreateSessionResponse, SessionResponse
 from services.ai_analysis import generate_title
@@ -26,7 +27,7 @@ async def create_session(
     db_session.add(session)
     await db_session.commit()
     await db_session.refresh(session)
-    logger.info("Created session id=%s", session.id)
+    logger.info("Created session id=%s", session.id, extra=session_log_extra(session.id))
     return CreateSessionResponse(
         id=session.id,
         title=session.title,
@@ -155,32 +156,38 @@ async def end_session(
             detail="Session is already ended",
         )
 
-    logger.info("Ending session id=%s with %d exchanges", session_id, len(session.exchanges))
+    extra: dict[str, str] = session_log_extra(session_id)
+    logger.info("Ending session id=%s with %d exchanges", session_id, len(session.exchanges), extra=extra)
 
     session.is_active = False
     session.ended_at = datetime.now(timezone.utc)
 
     transcripts = [e.transcript for e in session.exchanges]
     if transcripts:
-        logger.info("Generating title for session id=%s from %d transcripts", session_id, len(transcripts))
+        logger.info("Generating title for session id=%s from %d transcripts", session_id, len(transcripts), extra=extra)
         http_client = request.app.state.http_client
         ollama_base_url = request.app.state.ollama_base_url
         ollama_model = request.app.state.ollama_model
         ollama_num_ctx = request.app.state.ollama_num_ctx
         title = await generate_title(
-            transcripts, http_client, ollama_base_url, ollama_model, ollama_num_ctx
+            transcripts,
+            http_client,
+            ollama_base_url,
+            ollama_model,
+            ollama_num_ctx,
+            session_id=session_id,
         )
         if title:
             session.title = title
         else:
-            logger.warning("Title generation returned empty for session id=%s", session_id)
+            logger.warning("Title generation returned empty for session id=%s", session_id, extra=extra)
     else:
-        logger.info("Session id=%s has no transcripts, skipping title generation", session_id)
+        logger.info("Session id=%s has no transcripts, skipping title generation", session_id, extra=extra)
 
     await db_session.commit()
     await db_session.refresh(session)
     await context_window_cache.clear(session_id)
-    logger.info("Session id=%s ended (title=%r)", session_id, session.title)
+    logger.info("Session id=%s ended (title=%r)", session_id, session.title, extra=extra)
 
     exchanges = sorted(session.exchanges, key=lambda e: e.created_at)
     return SessionResponse(

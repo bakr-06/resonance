@@ -2,12 +2,16 @@ import json
 import logging
 import re
 import time
+import uuid
 from datetime import datetime
 from typing import TypedDict
 
 import httpx
 
+from logging_config import PROMPT_LOGGER_NAME, session_log_extra
+
 logger = logging.getLogger(__name__)
+prompt_logger = logging.getLogger(PROMPT_LOGGER_NAME)
 
 SYSTEM_PROMPT: str = """You are a plain, direct assistant. You receive zero or more earlier entries from the same journaling session, then one current entry. Treat the earlier entries as background only and respond to the current entry.
 
@@ -120,6 +124,28 @@ def _build_user_content(message: str, context: list[str]) -> str:
     )
 
 
+def _log_messages(messages: list[dict[str, str]], session_id: uuid.UUID) -> None:
+    """Write the exact text sent to the model into the session's log file.
+
+    Uses ``prompt_logger``, whose level is pinned to DEBUG by
+    ``configure_logging``, so the dump is always recorded even when LOG_LEVEL
+    is INFO. The console handler is restricted to INFO, so it stays off the
+    terminal. ``session_id`` routes the lines to that session's directory.
+    """
+    extra: dict[str, str] = session_log_extra(session_id)
+    for index, message in enumerate(messages, start=1):
+        prompt_logger.debug(
+            "--- message %d/%d role=%s chars=%d ---\n%s\n--- end message %d ---",
+            index,
+            len(messages),
+            message["role"],
+            len(message["content"]),
+            message["content"],
+            index,
+            extra=extra,
+        )
+
+
 async def _chat(
         http_client: httpx.AsyncClient,
         base_url: str,
@@ -128,6 +154,8 @@ async def _chat(
         messages: list[dict[str, str]],
         temperature: float,
         force_json: bool,
+        purpose: str,
+        session_id: uuid.UUID,
         num_predict: int | None = None,
 ) -> dict:
     """Call Ollama's native /api/chat, which (unlike /v1) honours num_ctx."""
@@ -147,9 +175,36 @@ async def _chat(
     if force_json:
         body["format"] = "json"
 
+    extra: dict[str, str] = session_log_extra(session_id)
+    total_chars: int = sum(len(message["content"]) for message in messages)
+    logger.info(
+        "Ollama request purpose=%s model=%s num_ctx=%d temperature=%s json=%s "
+        "messages=%d chars=%d (~%d tokens)",
+        purpose,
+        model,
+        num_ctx,
+        temperature,
+        force_json,
+        len(messages),
+        total_chars,
+        total_chars // CHARS_PER_TOKEN,
+        extra=extra,
+    )
+    _log_messages(messages, session_id)
+
     response = await http_client.post(f"{base_url}/api/chat", json=body)
     response.raise_for_status()
-    return response.json()
+    data: dict = response.json()
+
+    logger.info(
+        "Ollama response purpose=%s model=%s prompt_tokens=%s completion_tokens=%s",
+        purpose,
+        data.get("model", model),
+        data.get("prompt_eval_count", 0),
+        data.get("eval_count", 0),
+        extra=extra,
+    )
+    return data
 
 
 def _empty_result(model: str) -> AnalysisResult:
@@ -171,7 +226,9 @@ async def analyze(
         base_url: str,
         model: str,
         num_ctx: int,
+        session_id: uuid.UUID,
 ) -> AnalysisResult:
+    extra: dict[str, str] = session_log_extra(session_id)
     try:
         data = await _chat(
             http_client=http_client,
@@ -187,10 +244,12 @@ async def analyze(
             ],
             temperature=ANALYSIS_TEMPERATURE,
             force_json=True,
+            purpose="analysis",
+            session_id=session_id,
         )
 
         content: str = data["message"]["content"]
-        logger.debug("Raw analysis content: %s", content)
+        logger.debug("Raw analysis content: %s", content, extra=extra)
         content = _extract_json_object(content)
 
         reflection: str = ""
@@ -201,7 +260,7 @@ async def analyze(
                 reflection = parsed.get("reflection", "") or ""
                 mode = _normalize_mode(parsed.get("mode"))
         except (json.JSONDecodeError, AttributeError) as exc:
-            logger.warning("Failed to parse LLM reflection JSON: %s", exc)
+            logger.warning("Failed to parse LLM reflection JSON: %s", exc, extra=extra)
             try:
                 reflection_match = re.search(
                     r'"reflection"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"', content
@@ -215,7 +274,7 @@ async def analyze(
                 pass
 
         if not reflection.strip():
-            logger.warning("Ollama returned an empty reflection for model %r", model)
+            logger.warning("Ollama returned an empty reflection for model %r", model, extra=extra)
 
         return AnalysisResult(
             reflection=reflection,
@@ -229,7 +288,8 @@ async def analyze(
     except httpx.TimeoutException:
         logger.warning(
             "Ollama analysis timed out. Local inference may be slower than "
-            "OLLAMA_TIMEOUT_SECONDS; raise it if this keeps happening."
+            "OLLAMA_TIMEOUT_SECONDS; raise it if this keeps happening.",
+            extra=extra,
         )
         return _empty_result(model)
     except httpx.HTTPStatusError as exc:
@@ -237,10 +297,11 @@ async def analyze(
             "Ollama analysis HTTP error: %s %s",
             exc.response.status_code,
             exc.response.text[:200],
+            extra=extra,
         )
         return _empty_result(model)
     except Exception as exc:
-        logger.warning("Ollama analysis failed: %s", exc)
+        logger.warning("Ollama analysis failed: %s", exc, extra=extra)
         return _empty_result(model)
 
 
@@ -250,7 +311,9 @@ async def generate_title(
         base_url: str,
         model: str,
         num_ctx: int,
+        session_id: uuid.UUID,
 ) -> str:
+    extra: dict[str, str] = session_log_extra(session_id)
     try:
         combined: str = _fit_text("\n\n".join(transcripts), num_ctx)
         data = await _chat(
@@ -264,6 +327,8 @@ async def generate_title(
             ],
             temperature=TITLE_TEMPERATURE,
             force_json=False,
+            purpose="title",
+            session_id=session_id,
         )
 
         content: str = data["message"]["content"].strip()
@@ -276,7 +341,8 @@ async def generate_title(
     except httpx.TimeoutException:
         logger.warning(
             "Ollama title generation timed out. Local inference may be slower than "
-            "OLLAMA_TIMEOUT_SECONDS; raise it if this keeps happening."
+            "OLLAMA_TIMEOUT_SECONDS; raise it if this keeps happening.",
+            extra=extra,
         )
         return ""
     except httpx.HTTPStatusError as exc:
@@ -284,8 +350,9 @@ async def generate_title(
             "Ollama title generation HTTP error: %s %s",
             exc.response.status_code,
             exc.response.text[:200],
+            extra=extra,
         )
         return ""
     except Exception as exc:
-        logger.warning("Ollama title generation failed: %s", exc)
+        logger.warning("Ollama title generation failed: %s", exc, extra=extra)
         return ""

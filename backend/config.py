@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     ollama_model: str = "llama3.1"
     ollama_num_ctx: int = 8192
     ollama_timeout_seconds: float = 120.0
+    log_level: str = "INFO"
     db_user: str = "resonance"
     db_password: str = ""
     db_host: str = "localhost"

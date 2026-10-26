@@ -37,6 +37,7 @@ Desktop.ini
 
 # Misc
 *.log
+backend/logs/
 .env
 .env.local
 .env.*.local
