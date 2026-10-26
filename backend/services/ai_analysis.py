@@ -1,4 +1,3 @@
-import json
 import logging
 import re
 import time
@@ -13,21 +12,6 @@ from logging_config import PROMPT_LOGGER_NAME, session_log_extra
 logger = logging.getLogger(__name__)
 prompt_logger = logging.getLogger(PROMPT_LOGGER_NAME)
 
-SYSTEM_PROMPT: str = """You are a plain, direct assistant. You receive zero or more earlier entries from the same journaling session, then one current entry. Treat the earlier entries as background only and respond to the current entry.
-
-Classify the current entry:
-- "venting": the person needs to be heard, not analyzed.
-- "clarity": the person is unsure what they feel and wants help naming it.
-- "heard": the person knows what they feel and just needed to say it.
-
-Reply in one or two sentences. No advice, no questions, no therapy language.
-
-You MUST respond ONLY with valid JSON matching this exact schema with no extra text, markdown, or code fences:
-{
-  "mode": "venting" | "clarity" | "heard",
-  "reflection": "string"
-}"""
-
 TITLE_PROMPT: str = """Generate a short, meaningful title (maximum 6 words) for a journaling session based on these journal entries. The title should capture the main theme or feeling of the session.
 
 Respond only with the title text — no quotes, no explanations, no punctuation beyond what's in the title itself."""
@@ -35,7 +19,7 @@ Respond only with the title text — no quotes, no explanations, no punctuation 
 ANALYSIS_TEMPERATURE: float = 0.4
 TITLE_TEMPERATURE: float = 0.3
 
-# Roughly 4 characters per token. Reserved for the system prompt and reply.
+# Roughly 4 characters per token. Reserved for the reply.
 CHARS_PER_TOKEN: int = 4
 PROMPT_TOKEN_RESERVE: int = 1000
 
@@ -48,32 +32,6 @@ class AnalysisResult(TypedDict):
     completion_tokens: int
     request_id: str
     created_at: int
-
-
-def _normalize_mode(mode: str | None) -> str | None:
-    """Map model output onto the three modes we accept, or None if it made one up."""
-    if not mode:
-        return None
-    m: str = str(mode).strip().lower().replace(" ", "").replace("-", "")
-    if m == "venting":
-        return "venting"
-    if m == "clarity":
-        return "clarity"
-    if m in ("heard", "heared", "hear", "hearing"):
-        return "heard"
-    return None
-
-
-def _extract_json_object(content: str) -> str:
-    """Strip code fences and surrounding prose, leaving the JSON object."""
-    content = content.strip()
-    content = re.sub(r"```(?:json)?\s*|\s*```", "", content).strip()
-    if content.startswith("{") and content.endswith("}"):
-        return content
-    match = re.search(r"\{.*\}", content, re.DOTALL)
-    if match:
-        return match.group(0)
-    return content
 
 
 def _parse_created_at(raw: str | None) -> int:
@@ -236,49 +194,27 @@ async def analyze(
             model=model,
             num_ctx=num_ctx,
             messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
                 {
                     "role": "user",
                     "content": _fit_text(_build_user_content(message, context), num_ctx),
                 },
             ],
             temperature=ANALYSIS_TEMPERATURE,
-            force_json=True,
+            force_json=False,
             purpose="analysis",
             session_id=session_id,
         )
 
         content: str = data["message"]["content"]
         logger.debug("Raw analysis content: %s", content, extra=extra)
-        content = _extract_json_object(content)
 
-        reflection: str = ""
-        mode: str | None = None
-        try:
-            parsed = json.loads(content)
-            if isinstance(parsed, dict):
-                reflection = parsed.get("reflection", "") or ""
-                mode = _normalize_mode(parsed.get("mode"))
-        except (json.JSONDecodeError, AttributeError) as exc:
-            logger.warning("Failed to parse LLM reflection JSON: %s", exc, extra=extra)
-            try:
-                reflection_match = re.search(
-                    r'"reflection"\s*:\s*"([^"\\]*(?:\\.[^"\\]*)*)"', content
-                )
-                if reflection_match:
-                    reflection = reflection_match.group(1).encode("utf-8").decode("unicode_escape")
-                mode_match = re.search(r'"mode"\s*:\s*"([^"]+)"', content, re.IGNORECASE)
-                if mode_match:
-                    mode = _normalize_mode(mode_match.group(1))
-            except Exception:
-                pass
-
-        if not reflection.strip():
+        reflection: str = content.strip()
+        if not reflection:
             logger.warning("Ollama returned an empty reflection for model %r", model, extra=extra)
 
         return AnalysisResult(
             reflection=reflection,
-            detected_mode=mode,
+            detected_mode=None,
             model_used=data.get("model", model),
             prompt_tokens=data.get("prompt_eval_count", 0),
             completion_tokens=data.get("eval_count", 0),
