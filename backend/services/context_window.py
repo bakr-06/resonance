@@ -66,10 +66,15 @@ class ContextWindowCache:
 
         If the session is not cached yet, do nothing: the next read loads the
         window from the database, which already contains this exchange.
+        Appending an exchange that is already cached is a no-op, so a retried
+        request cannot spend a second slot on the same entry.
         """
         async with self._lock:
             window = self._windows.get(session_id)
             if window is None:
+                return
+
+            if any(cached.exchange_id == exchange_id for cached in window):
                 return
 
             window.append(
@@ -133,10 +138,14 @@ class ContextWindowCache:
 
     @staticmethod
     def _sort_chronologically(window: deque[CachedExchange]) -> None:
-        """Keep order stable when concurrent requests append out of order."""
+        """Keep order stable when concurrent requests append out of order.
+
+        Ties break on ``exchange_id`` so an in-memory window orders exactly like
+        a database reload, which sorts on ``(created_at, id)``.
+        """
         ordered: list[CachedExchange] = sorted(
             window,
-            key=lambda cached: cached.created_at,
+            key=lambda cached: (cached.created_at, cached.exchange_id),
         )
         window.clear()
         window.extend(ordered)
