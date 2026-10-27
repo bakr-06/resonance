@@ -17,7 +17,8 @@ from pathlib import Path
 from typing import TextIO
 
 BACKEND_DIR: Path = Path(__file__).resolve().parent
-DEFAULT_LOG_DIR: Path = BACKEND_DIR / "logs"
+import os
+DEFAULT_LOG_DIR: Path = Path(os.environ.get("RESONANCE_LOG_DIR") or (Path("/tmp") / "resonance-logs"))
 APP_LOG_NAME: str = "app.log"
 SESSION_LOG_NAME: str = "requests.log"
 MAX_OPEN_FILES: int = 32

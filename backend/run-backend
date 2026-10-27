@@ -1,2 +1,5 @@
 #!/bin/bash
-/home/bakr/code/assistant/resonance/backend/.venv/bin/python -m fastapi dev /home/bakr/code/assistant/resonance/backend/main.py
+cd /home/bakr/code/assistant/resonance/backend
+export RESONANCE_LOG_DIR=/tmp/resonance-logs
+mkdir -p /tmp/resonance-logs
+/home/bakr/code/assistant/resonance/backend/.venv/bin/uvicorn main:app --reload --host 127.0.0.1 --port 8000 --reload-exclude "logs/*" --reload-exclude "logs/**" --reload-exclude "__pycache__/*" --reload-exclude "**/__pycache__/*"
