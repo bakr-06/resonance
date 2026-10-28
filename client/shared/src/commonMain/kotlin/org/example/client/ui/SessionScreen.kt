@@ -14,6 +14,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -95,8 +97,43 @@ fun SessionScreen(
             contentAlignment = Alignment.Center,
         ) {
             when {
-                uiState.errorMessage != null ->
-                    Text(text = uiState.errorMessage ?: "Something went wrong")
+                uiState.errorMessage != null -> {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.errorContainer,
+                            ),
+                        ) {
+                            Text(
+                                text = uiState.errorMessage ?: "Something went wrong",
+                                modifier = Modifier.padding(16.dp),
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                textAlign = TextAlign.Center,
+                            )
+                        }
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            if (uiState.activeSessionId == null && !uiState.isSessionEnded) {
+                                Button(onClick = { viewModel.retryInitialization() }) {
+                                    Text("Retry")
+                                }
+                            } else if (uiState.isEndingSession == false && uiState.isSessionEnded == false && uiState.recordingStatus == RecordingStatus.Idle) {
+                                TextButton(onClick = { viewModel.retryEndSession() }) {
+                                    Text("Retry ending session")
+                                }
+                            }
+                            TextButton(onClick = { viewModel.clearError() }) {
+                                Text("Dismiss")
+                            }
+                        }
+                    }
+                }
 
                 uiState.isLoadingDetails -> Text(text = "Loading exchanges…")
                 uiState.exchanges.isNotEmpty() -> ExchangeChat(exchanges = uiState.exchanges)
