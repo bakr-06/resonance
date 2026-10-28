@@ -19,8 +19,15 @@ class ExchangeViewModel internal constructor(
     val uiState: StateFlow<ExchangeUiState> = _uiState.asStateFlow()
 
     init {
+        initialize()
+    }
+
+    fun initialize() {
         viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoadingDetails = true)
+            _uiState.value = _uiState.value.copy(
+                isLoadingDetails = true,
+                errorMessage = null,
+            )
 
             val session = when (val result = sessionsRepository.getActiveSession()) {
                 is Result.Success -> result.data
@@ -53,8 +60,17 @@ class ExchangeViewModel internal constructor(
                 exchanges = activeSession.exchanges.map { it.toExchangeUi() },
                 activeSessionId = activeSession.id,
                 isLoadingDetails = false,
+                errorMessage = null,
             )
         }
+    }
+
+    fun clearError() {
+        _uiState.value = _uiState.value.copy(errorMessage = null)
+    }
+
+    fun retryInitialization() {
+        initialize()
     }
 
     fun onRecordClick() {
@@ -87,7 +103,11 @@ class ExchangeViewModel internal constructor(
         val alreadyEnding = _uiState.value.isEndingSession
         if (alreadyEnded || alreadyEnding) return
 
-        _uiState.value = _uiState.value.copy(isEndingSession = true)
+        endSessionInternal(sessionId)
+    }
+
+    private fun endSessionInternal(sessionId: String) {
+        _uiState.value = _uiState.value.copy(isEndingSession = true, errorMessage = null)
         println("VM onEndSession: ending session id=$sessionId")
         viewModelScope.launch {
             when (val result = sessionsRepository.endSession(sessionId)) {
@@ -96,6 +116,7 @@ class ExchangeViewModel internal constructor(
                     _uiState.value = _uiState.value.copy(
                         isEndingSession = false,
                         isSessionEnded = true,
+                        errorMessage = null,
                     )
                 }
 
@@ -108,6 +129,12 @@ class ExchangeViewModel internal constructor(
                 }
             }
         }
+    }
+
+    fun retryEndSession() {
+        val sessionId = _uiState.value.activeSessionId ?: return
+        if (_uiState.value.isEndingSession || _uiState.value.isSessionEnded) return
+        endSessionInternal(sessionId)
     }
 
     private fun uploadRecording() {
