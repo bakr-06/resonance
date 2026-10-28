@@ -5,7 +5,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env")
 
     ollama_base_url: str = "http://localhost:11434"
-    ollama_model: str = "llama3.1"
+    ollama_model: str = "Qwen3.5-9B-abliterated"
     ollama_num_ctx: int = 8192
     ollama_timeout_seconds: float = 120.0
     log_level: str = "INFO"

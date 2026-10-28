@@ -16,6 +16,7 @@ CONTEXT_WINDOW_SIZE: int = 6
 class CachedExchange:
     exchange_id: uuid.UUID
     transcript: str
+    reflection: str
     created_at: datetime
 
 
@@ -43,6 +44,20 @@ class ContextWindowCache:
         ``exclude_exchange_id`` keeps the exchange currently being analyzed out
         of its own context window.
         """
+        exchanges = await self.get_exchanges(
+            session_id=session_id,
+            db_session=db_session,
+            exclude_exchange_id=exclude_exchange_id,
+        )
+        return [exchange.transcript for exchange in exchanges]
+
+    async def get_exchanges(
+            self,
+            session_id: uuid.UUID,
+            db_session: AsyncSession,
+            exclude_exchange_id: uuid.UUID | None = None,
+    ) -> list[CachedExchange]:
+        """Return full exchanges in chronological order, oldest first."""
         async with self._lock:
             window = self._windows.get(session_id)
             if window is None:
@@ -50,7 +65,7 @@ class ContextWindowCache:
                 self._windows[session_id] = window
 
             return [
-                cached.transcript
+                cached
                 for cached in window
                 if cached.exchange_id != exclude_exchange_id
             ]
@@ -60,6 +75,7 @@ class ContextWindowCache:
             session_id: uuid.UUID,
             exchange_id: uuid.UUID,
             transcript: str,
+            reflection: str,
             created_at: datetime,
     ) -> None:
         """Add a committed exchange to the window.
@@ -81,6 +97,7 @@ class ContextWindowCache:
                 CachedExchange(
                     exchange_id=exchange_id,
                     transcript=transcript,
+                    reflection=reflection,
                     created_at=created_at,
                 )
             )
@@ -91,6 +108,7 @@ class ContextWindowCache:
             session_id: uuid.UUID,
             exchange_id: uuid.UUID,
             transcript: str,
+            reflection: str | None = None,
     ) -> None:
         """Replace the cached transcript after an exchange is edited."""
         async with self._lock:
@@ -100,7 +118,10 @@ class ContextWindowCache:
 
             for index, cached in enumerate(window):
                 if cached.exchange_id == exchange_id:
-                    window[index] = replace(cached, transcript=transcript)
+                    if reflection is None:
+                        window[index] = replace(cached, transcript=transcript)
+                    else:
+                        window[index] = replace(cached, transcript=transcript, reflection=reflection)
                     return
 
     async def clear(self, session_id: uuid.UUID) -> None:
@@ -129,6 +150,7 @@ class ContextWindowCache:
                 CachedExchange(
                     exchange_id=exchange.id,
                     transcript=exchange.transcript,
+                    reflection=exchange.reflection,
                     created_at=exchange.created_at,
                 )
                 for exchange in exchanges

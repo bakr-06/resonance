@@ -8,9 +8,12 @@ from typing import TypedDict
 import httpx
 
 from logging_config import PROMPT_LOGGER_NAME, session_log_extra
+from services.context_window import CachedExchange
 
 logger = logging.getLogger(__name__)
 prompt_logger = logging.getLogger(PROMPT_LOGGER_NAME)
+
+SYSTEM_PROMPT: str : """You are friendly, empatheic understand listening non-judgemental, humorous, especially with things related to the my occupation and interests, your answers should be conscise and encouraging of following up. your goal is for the user to continue down the path of thought they are havaing."""
 
 TITLE_PROMPT: str = """Generate a short, meaningful title (maximum 6 words) for a journaling session based on these journal entries. The title should capture the main theme or feeling of the session.
 
@@ -64,20 +67,30 @@ def _fit_text(text: str, num_ctx: int) -> str:
     return text[:head_length] + "\n\n[...]\n\n" + text[-tail_length:]
 
 
-def _build_user_content(message: str, context: list[str]) -> str:
+def _build_user_content(message: str, context: list[CachedExchange] | list[str]) -> str:
     """Put earlier exchanges before the current one, and say nothing else."""
     if not context:
         return message
 
     entries: str = "\n\n".join(
-        f"Earlier entry {index}:\n{transcript}"
-        for index, transcript in enumerate(context, start=1)
+        _format_exchange(exchange, index)
+        for index, exchange in enumerate(context, start=1)
     )
     return (
         f"{entries}\n\n---\n\n"
         "Current entry:\n"
         f"{message}"
     )
+
+
+def _format_exchange(exchange: CachedExchange | str, index: int) -> str:
+    if isinstance(exchange, str):
+        return f"Earlier entry {index}:\n{exchange}"
+    transcript = exchange.transcript
+    reflection = getattr(exchange, "reflection", "") or ""
+    if reflection.strip():
+        return f"Earlier entry {index}:\nUser: {transcript}\n\nAssistant: {reflection}"
+    return f"Earlier entry {index}:\n{transcript}"
 
 
 def _log_messages(messages: list[dict[str, str]], session_id: uuid.UUID) -> None:
@@ -177,26 +190,50 @@ def _empty_result(model: str) -> AnalysisResult:
 
 async def analyze(
         message: str,
-        context: list[str],
+        context: list[CachedExchange] | list[str],
         http_client: httpx.AsyncClient,
         base_url: str,
         model: str,
         num_ctx: int,
         session_id: uuid.UUID,
+        system_prompt: str | None = None,
 ) -> AnalysisResult:
     extra: dict[str, str] = session_log_extra(session_id)
     try:
+        filtered_context: list[CachedExchange] | list[str] = []
+        if context:
+            for exchange in context:
+                if isinstance(exchange, CachedExchange):
+                    reflection = exchange.reflection or ""
+                    if not reflection.strip():
+                        # Only a full exchange (transcription + response). If no response, skip.
+                        continue
+                    exchange_text = _format_exchange(exchange, 0)
+                    if len(exchange_text) > _max_chars(num_ctx):
+                        continue
+                    filtered_context.append(exchange)
+                else:
+                    filtered_context.append(exchange)
+
+        user_content = _build_user_content(message, filtered_context)
+        user_content = _fit_text(user_content, num_ctx)
+
+        messages: list[dict[str, str]] = []
+        if system_prompt and system_prompt.strip():
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append(
+            {
+                "role": "user",
+                "content": user_content,
+            },
+        )
+
         data = await _chat(
             http_client=http_client,
             base_url=base_url,
             model=model,
             num_ctx=num_ctx,
-            messages=[
-                {
-                    "role": "user",
-                    "content": _fit_text(_build_user_content(message, context), num_ctx),
-                },
-            ],
+            messages=messages,
             temperature=ANALYSIS_TEMPERATURE,
             force_json=False,
             purpose="analysis",

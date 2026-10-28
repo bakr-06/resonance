@@ -68,6 +68,7 @@ def make_exchange(
         exchange_id: uuid.UUID,
         transcript: str,
         created_at: datetime,
+        reflection: str = "",
 ) -> Exchange:
     """Build a detached ORM row, so a renamed column breaks the tests too."""
     return Exchange(
@@ -75,7 +76,7 @@ def make_exchange(
         session_id=SESSION_ID,
         created_at=created_at,
         transcript=transcript,
-        reflection="",
+        reflection=reflection,
         detected_mode=None,
     )
 
@@ -90,6 +91,7 @@ def make_rows(count: int) -> list[Exchange]:
             exchange_id=uuid.UUID(int=index),
             transcript=f"entry {index}",
             created_at=BASE_TIME + timedelta(minutes=index),
+            reflection=f"response {index}",
         )
         for index in range(count, 0, -1)
     ]
@@ -139,6 +141,7 @@ def test_append_on_uncached_session_does_not_create_window() -> None:
             session_id=SESSION_ID,
             exchange_id=uuid.UUID(int=777),
             transcript="ghost",
+            reflection="reply",
             created_at=BASE_TIME + timedelta(minutes=99),
         )
     )
@@ -174,6 +177,7 @@ def test_window_is_capped_at_max_size() -> None:
             session_id=SESSION_ID,
             exchange_id=uuid.UUID(int=MAX_SIZE + 1),
             transcript=f"entry {MAX_SIZE + 1}",
+            reflection=f"response {MAX_SIZE + 1}",
             created_at=BASE_TIME + timedelta(minutes=MAX_SIZE + 1),
         )
     )
@@ -206,6 +210,7 @@ def test_append_sorts_chronologically() -> None:
             session_id=SESSION_ID,
             exchange_id=uuid.UUID(int=5),
             transcript="five",
+            reflection="five_r",
             created_at=BASE_TIME + timedelta(minutes=5),
         )
     )
@@ -214,6 +219,7 @@ def test_append_sorts_chronologically() -> None:
             session_id=SESSION_ID,
             exchange_id=uuid.UUID(int=3),
             transcript="three",
+            reflection="three_r",
             created_at=BASE_TIME + timedelta(minutes=3),
         )
     )
@@ -235,6 +241,7 @@ def test_duplicate_append_is_ignored() -> None:
                 session_id=SESSION_ID,
                 exchange_id=uuid.UUID(int=50),
                 transcript="hello",
+                reflection="hi",
                 created_at=BASE_TIME + timedelta(minutes=50),
             )
         )
@@ -261,6 +268,7 @@ def test_equal_timestamps_break_ties_by_id() -> None:
             session_id=SESSION_ID,
             exchange_id=uuid.UUID(int=20),
             transcript="twenty",
+            reflection="twenty_r",
             created_at=same_time,
         )
     )
@@ -269,6 +277,7 @@ def test_equal_timestamps_break_ties_by_id() -> None:
             session_id=SESSION_ID,
             exchange_id=uuid.UUID(int=10),
             transcript="ten",
+            reflection="ten_r",
             created_at=same_time,
         )
     )
@@ -289,6 +298,7 @@ def test_update_transcript_replaces_in_place() -> None:
             session_id=SESSION_ID,
             exchange_id=uuid.UUID(int=2),
             transcript="edited",
+            reflection="edited_r",
         )
     )
 

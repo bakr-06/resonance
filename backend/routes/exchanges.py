@@ -72,12 +72,13 @@ async def create_exchange(
 
     whisper_ms = int(round((time.time() - t0) * 1000))
 
-    context: list[str] = await context_window_cache.get_transcripts(session_id, db_session)
+    context = await context_window_cache.get_exchanges(session_id, db_session)
 
     http_client = request.app.state.http_client
     ollama_base_url = request.app.state.ollama_base_url
     ollama_model = request.app.state.ollama_model
     ollama_num_ctx = request.app.state.ollama_num_ctx
+    system_prompt = getattr(request.app.state, "analysis_system_prompt", None)
     t0 = time.time()
     analysis_result = await analyze(
         whisper_result["raw_text"],
@@ -87,6 +88,7 @@ async def create_exchange(
         ollama_model,
         ollama_num_ctx,
         session_id=session_id,
+        system_prompt=system_prompt,
     )
     analysis_ms = int(round((time.time() - t0) * 1000))
 
@@ -127,6 +129,7 @@ async def create_exchange(
         session_id=session_id,
         exchange_id=exchange.id,
         transcript=exchange.transcript,
+        reflection=exchange.reflection,
         created_at=exchange.created_at,
     )
 
@@ -174,7 +177,7 @@ async def update_exchange(
             detail=f"Exchange {exchange_id} not found in session {session_id}",
         )
 
-    context: list[str] = await context_window_cache.get_transcripts(
+    context = await context_window_cache.get_exchanges(
         session_id, db_session, exclude_exchange_id=exchange_id
     )
 
@@ -182,6 +185,7 @@ async def update_exchange(
     ollama_base_url = request.app.state.ollama_base_url
     ollama_model = request.app.state.ollama_model
     ollama_num_ctx = request.app.state.ollama_num_ctx
+    system_prompt = getattr(request.app.state, "analysis_system_prompt", None)
     t0 = time.time()
     analysis_result = await analyze(
         body.transcript,
@@ -191,6 +195,7 @@ async def update_exchange(
         ollama_model,
         ollama_num_ctx,
         session_id=session_id,
+        system_prompt=system_prompt,
     )
     analysis_ms = int(round((time.time() - t0) * 1000))
 
@@ -213,6 +218,7 @@ async def update_exchange(
         session_id=session_id,
         exchange_id=exchange_id,
         transcript=exchange.transcript,
+        reflection=exchange.reflection,
     )
 
     return ExchangeResponse(
