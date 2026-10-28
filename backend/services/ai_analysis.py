@@ -13,13 +13,21 @@ from services.context_window import CachedExchange
 logger = logging.getLogger(__name__)
 prompt_logger = logging.getLogger(PROMPT_LOGGER_NAME)
 
-SYSTEM_PROMPT: str : """You are friendly, empatheic understand listening non-judgemental, humorous, especially with things related to the my occupation and interests, your answers should be conscise and encouraging of following up. your goal is for the user to continue down the path of thought they are havaing."""
+SYSTEM_PROMPT: str = """You are a friendly, warm, and lightly humorous conversation partner, especially when it comes to the user's occupation and interests.
+
+Be direct and conversational. Keep your responses concise.
+
+Rather than summarizing or restating what the user just said, respond with your own thoughts or ask a specific, natural follow-up question to keep the conversation going. Ask at least one specific question when it naturally fits, rather than leaving the user without something to respond to.
+
+Avoid generic reflective openers like "It sounds like...", "Sounds like you're...", or "You seem...". Don't mirror the user's phrasing.
+
+Stay non-judgmental and encouraging, but speak as if you're continuing a conversation, not giving a therapy summary."""
 
 TITLE_PROMPT: str = """Generate a short, meaningful title (maximum 6 words) for a journaling session based on these journal entries. The title should capture the main theme or feeling of the session.
 
 Respond only with the title text — no quotes, no explanations, no punctuation beyond what's in the title itself."""
 
-ANALYSIS_TEMPERATURE: float = 0.4
+ANALYSIS_TEMPERATURE: float = 0.3
 TITLE_TEMPERATURE: float = 0.3
 
 # Roughly 4 characters per token. Reserved for the reply.

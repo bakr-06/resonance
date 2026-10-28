@@ -9,6 +9,7 @@ from config import settings
 from db.database import engine
 from logging_config import configure_logging
 from routes import session_router
+from services.ai_analysis import SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,7 @@ async def lifespan(fastapi_app: FastAPI) -> AsyncIterator[None]:
     fastapi_app.state.ollama_base_url = settings.ollama_base_url
     fastapi_app.state.ollama_model = settings.ollama_model
     fastapi_app.state.ollama_num_ctx = settings.ollama_num_ctx
+    fastapi_app.state.analysis_system_prompt = SYSTEM_PROMPT
     await _check_ollama_model(async_client, settings.ollama_base_url, settings.ollama_model)
     yield
     await async_client.aclose()
