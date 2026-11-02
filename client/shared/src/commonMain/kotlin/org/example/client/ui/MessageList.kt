@@ -13,16 +13,17 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import org.example.client.data.network.dto.MessageRole
 
 @Composable
-fun ExchangeChat(
-    exchanges: List<ExchangeUi>,
+fun MessageList(
+    messages: List<MessageUi>,
 ) {
     val listState = rememberLazyListState()
 
-    LaunchedEffect(exchanges.size) {
-        if (exchanges.isNotEmpty()) {
-            listState.animateScrollToItem(exchanges.size * 2 - 1)
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.size - 1)
         }
     }
 
@@ -32,16 +33,11 @@ fun ExchangeChat(
             modifier = Modifier.fillMaxSize().padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(exchanges, key = { it.id }) { exchange ->
-                ExchangeBubble(
-                    text = exchange.transcript,
-                    timestamp = exchange.timestamp,
-                    isUser = true,
-                )
-                ExchangeBubble(
-                    text = exchange.reflection,
-                    timestamp = exchange.timestamp,
-                    isUser = false,
+            items(messages, key = { it.id }) { message ->
+                MessageBubble(
+                    text = message.content,
+                    timestamp = message.timestamp,
+                    isUser = message.role == MessageRole.User,
                 )
             }
         }
@@ -54,7 +50,7 @@ fun ExchangeChat(
 }
 
 @Composable
-private fun ExchangeBubble(
+private fun MessageBubble(
     text: String,
     timestamp: String,
     isUser: Boolean,

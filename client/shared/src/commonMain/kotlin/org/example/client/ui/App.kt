@@ -19,15 +19,15 @@ fun App(
         startDestination = SessionDestination,
     ) {
         composable<SessionDestination> {
-            val exchangeViewModel: ExchangeViewModel = viewModel {
-                ExchangeViewModel(
+            val sessionViewModel: SessionViewModel = viewModel {
+                SessionViewModel(
                     sessionsRepository = appDependencies.sessionsRepository,
                     recordAudioService = appDependencies.recordAudioService,
                 )
             }
 
             SessionScreen(
-                viewModel = exchangeViewModel,
+                viewModel = sessionViewModel,
                 onSessionEnded = { sessionId ->
                     println("Navigation: session ended -> Session Summary (sessionId=$sessionId)")
                     navController.navigate(SessionSummaryDestination(sessionId)) {

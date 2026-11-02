@@ -8,9 +8,9 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from db.database import DbSession
-from db.models import Session as SessionModel
+from db.models import MessageRole, Session as SessionModel
 from logging_config import session_log_extra
-from schemas.exchanges import ExchangeResponse
+from schemas.messages import MessageResponse
 from schemas.sessions import CreateSessionRequest, CreateSessionResponse, SessionResponse
 from services.ai_analysis import generate_title
 from services.context_window import context_window_cache
@@ -64,8 +64,9 @@ async def list_sessions(
             created_at=s.created_at.isoformat(),
             ended_at=s.ended_at.isoformat() if s.ended_at else None,
             is_active=s.is_active,
-            # TODO: Get rid of empty exchanges, they are a waste of memory
-            exchanges=[],
+            # The list endpoint does not load messages, so an empty list here
+            # means "not loaded", not "this session has no messages".
+            messages=[],
         )
         for s in sessions
     ]
@@ -77,7 +78,7 @@ async def get_active_session(
 ) -> SessionResponse | None:
     result = await db_session.execute(
         select(SessionModel)
-        .options(selectinload(SessionModel.exchanges))
+        .options(selectinload(SessionModel.messages))
         .where(SessionModel.is_active == True)  # noqa: E712
         .limit(1)
     )
@@ -86,7 +87,7 @@ async def get_active_session(
     if session is None:
         return None
 
-    exchanges = sorted(session.exchanges, key=lambda e: e.created_at)
+    messages = sorted(session.messages, key=lambda m: (m.created_at, m.id))
     return SessionResponse(
         id=session.id,
         user_id=session.user_id,
@@ -94,18 +95,9 @@ async def get_active_session(
         created_at=session.created_at.isoformat(),
         ended_at=session.ended_at.isoformat() if session.ended_at else None,
         is_active=session.is_active,
-        exchanges=[
-            ExchangeResponse(
-                id=e.id,
-                session_id=e.session_id,
-                transcript=e.transcript,
-                reflection=e.reflection,
-                detected_mode=e.detected_mode,
-                created_at=e.created_at.isoformat(),
-            )
-            for e in exchanges
-        ],
+        messages=[MessageResponse.from_message(m) for m in messages],
     )
+
 
 
 @session_router.get("/sessions/{session_id}", response_model=SessionResponse)
@@ -115,7 +107,7 @@ async def get_session_details(
 ) -> SessionResponse:
     result = await db_session.execute(
         select(SessionModel)
-        .options(selectinload(SessionModel.exchanges))
+        .options(selectinload(SessionModel.messages))
         .where(SessionModel.id == session_id)
     )
     session = result.scalar_one_or_none()
@@ -125,7 +117,7 @@ async def get_session_details(
             detail=f"Session {session_id} not found",
         )
 
-    exchanges = sorted(session.exchanges, key=lambda e: e.created_at)
+    messages = sorted(session.messages, key=lambda m: (m.created_at, m.id))
     return SessionResponse(
         id=session.id,
         user_id=session.user_id,
@@ -133,18 +125,9 @@ async def get_session_details(
         created_at=session.created_at.isoformat(),
         ended_at=session.ended_at.isoformat() if session.ended_at else None,
         is_active=session.is_active,
-        exchanges=[
-            ExchangeResponse(
-                id=e.id,
-                session_id=e.session_id,
-                transcript=e.transcript,
-                reflection=e.reflection,
-                detected_mode=e.detected_mode,
-                created_at=e.created_at.isoformat(),
-            )
-            for e in exchanges
-        ],
+        messages=[MessageResponse.from_message(m) for m in messages],
     )
+
 
 
 @session_router.post("/sessions/{session_id}/end", response_model=SessionResponse)
@@ -155,7 +138,7 @@ async def end_session(
 ) -> SessionResponse:
     result = await db_session.execute(
         select(SessionModel)
-        .options(selectinload(SessionModel.exchanges))
+        .options(selectinload(SessionModel.messages))
         .where(SessionModel.id == session_id)
     )
     session = result.scalar_one_or_none()
@@ -171,12 +154,16 @@ async def end_session(
         )
 
     extra: dict[str, str] = session_log_extra(session_id)
-    logger.info("Ending session id=%s with %d exchanges", session_id, len(session.exchanges), extra=extra)
+    logger.info("Ending session id=%s with %d messages", session_id, len(session.messages), extra=extra)
 
     session.is_active = False
     session.ended_at = datetime.now(timezone.utc)
 
-    transcripts = [e.transcript for e in session.exchanges]
+    transcripts = [
+        message.content
+        for message in session.messages
+        if message.role is MessageRole.USER
+    ]
     if transcripts:
         logger.info("Generating title for session id=%s from %d transcripts", session_id, len(transcripts), extra=extra)
         http_client = request.app.state.http_client
@@ -203,7 +190,7 @@ async def end_session(
     await context_window_cache.clear(session_id)
     logger.info("Session id=%s ended (title=%r)", session_id, session.title, extra=extra)
 
-    exchanges = sorted(session.exchanges, key=lambda e: e.created_at)
+    messages = sorted(session.messages, key=lambda m: (m.created_at, m.id))
     return SessionResponse(
         id=session.id,
         user_id=session.user_id,
@@ -211,18 +198,9 @@ async def end_session(
         created_at=session.created_at.isoformat(),
         ended_at=session.ended_at.isoformat() if session.ended_at else None,
         is_active=session.is_active,
-        exchanges=[
-            ExchangeResponse(
-                id=e.id,
-                session_id=e.session_id,
-                transcript=e.transcript,
-                reflection=e.reflection,
-                detected_mode=e.detected_mode,
-                created_at=e.created_at.isoformat(),
-            )
-            for e in exchanges
-        ],
+        messages=[MessageResponse.from_message(m) for m in messages],
     )
+
 
 
 @session_router.delete("/sessions/{session_id}", status_code=HTTPStatus.NO_CONTENT)

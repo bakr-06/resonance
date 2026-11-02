@@ -11,5 +11,5 @@ data class SessionDto(
     @SerialName("created_at") val createdAt: String,
     @SerialName("ended_at") val endedAt: String? = null,
     @SerialName("is_active") val isActive: Boolean,
-    val exchanges: List<ExchangeDto> = emptyList(),
+    val messages: List<MessageDto> = emptyList(),
 )

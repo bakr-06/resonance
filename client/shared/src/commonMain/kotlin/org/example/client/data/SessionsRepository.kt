@@ -4,7 +4,7 @@ import io.ktor.client.plugins.*
 import org.example.client.Result
 import org.example.client.data.network.NetworkError
 import org.example.client.data.network.SessionsApi
-import org.example.client.data.network.dto.ExchangeDto
+import org.example.client.data.network.dto.MessageDto
 import org.example.client.data.network.dto.SessionDto
 import java.io.File
 
@@ -66,14 +66,14 @@ class SessionsRepository(
             Result.Error(NetworkError.NetworkFailure)
         }
 
-    suspend fun createExchange(sessionId: String, audioFile: File): Result<ExchangeDto, NetworkError> =
+    suspend fun createMessages(sessionId: String, audioFile: File): Result<List<MessageDto>, NetworkError> =
         try {
-            Result.Success(sessionsApi.createExchange(sessionId, audioFile))
+            Result.Success(sessionsApi.createMessages(sessionId, audioFile).messages)
         } catch (exception: ResponseException) {
-            println("SessionsRepository.createExchange: HTTP error (${exception.message})")
+            println("SessionsRepository.createMessages: HTTP error (${exception.message})")
             Result.Error(NetworkError.HttpError(exception.response.status.value))
         } catch (exception: Exception) {
-            println("SessionsRepository.createExchange: network failure (${exception.message})")
+            println("SessionsRepository.createMessages: network failure (${exception.message})")
             Result.Error(NetworkError.NetworkFailure)
         }
 }

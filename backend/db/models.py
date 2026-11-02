@@ -2,7 +2,7 @@ import enum
 import uuid
 from datetime import date, datetime, timezone
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Index, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -14,6 +14,14 @@ class Base(DeclarativeBase):
 class SocialStatus(str, enum.Enum):
     SINGLE = "single"
     MARRIED = "married"
+
+    def __str__(self) -> str:
+        return self.value
+
+
+class MessageRole(str, enum.Enum):
+    USER = "user"
+    ASSISTANT = "assistant"
 
     def __str__(self) -> str:
         return self.value
@@ -32,31 +40,37 @@ class Session(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
     user: Mapped["User"] = relationship(back_populates="sessions")
-    exchanges: Mapped[list["Exchange"]] = relationship(
+    messages: Mapped[list["Message"]] = relationship(
         back_populates="session", cascade="all, delete-orphan"
     )
 
 
-class Exchange(Base):
-    __tablename__ = "exchange"
+class Message(Base):
+    __tablename__ = "message"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     session_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("session.id"), nullable=False
     )
-    transcript: Mapped[str] = mapped_column(Text)
-    reflection: Mapped[str] = mapped_column(Text)
-    detected_mode: Mapped[str | None] = mapped_column(String(20))
+    role: Mapped[MessageRole] = mapped_column(
+        Enum(MessageRole, values_callable=lambda obj: [e.value for e in obj], name="messagerole"),
+        nullable=False,
+    )
+    content: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )
 
-    session: Mapped["Session"] = relationship(back_populates="exchanges")
+    session: Mapped["Session"] = relationship(back_populates="messages")
     transcription_metrics: Mapped["TranscriptionMetrics"] = relationship(
-        back_populates="exchange", uselist=False, cascade="all, delete-orphan"
+        back_populates="message", uselist=False, cascade="all, delete-orphan"
     )
     analysis_metrics: Mapped["AnalysisMetrics"] = relationship(
-        back_populates="exchange", uselist=False, cascade="all, delete-orphan"
+        back_populates="message", uselist=False, cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (
+        Index("ix_message_session_created_at", "session_id", "created_at", "id"),
     )
 
 
@@ -64,7 +78,7 @@ class TranscriptionMetrics(Base):
     __tablename__ = "transcription_metrics"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("exchange.id"), primary_key=True
+        UUID(as_uuid=True), ForeignKey("message.id"), primary_key=True
     )
     transcript_segments: Mapped[list] = mapped_column(JSONB)
     transcript_duration_ms: Mapped[int] = mapped_column(Integer)
@@ -72,14 +86,14 @@ class TranscriptionMetrics(Base):
     detected_language: Mapped[str | None] = mapped_column(String(10))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
-    exchange: Mapped["Exchange"] = relationship(back_populates="transcription_metrics")
+    message: Mapped["Message"] = relationship(back_populates="transcription_metrics")
 
 
 class AnalysisMetrics(Base):
     __tablename__ = "analysis_metrics"
 
     id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("exchange.id"), primary_key=True
+        UUID(as_uuid=True), ForeignKey("message.id"), primary_key=True
     )
     prompt_tokens: Mapped[int] = mapped_column(Integer)
     completion_tokens: Mapped[int] = mapped_column(Integer)
@@ -88,7 +102,7 @@ class AnalysisMetrics(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     processing_ms: Mapped[int] = mapped_column(Integer)
 
-    exchange: Mapped["Exchange"] = relationship(back_populates="analysis_metrics")
+    message: Mapped["Message"] = relationship(back_populates="analysis_metrics")
 
 
 class User(Base):

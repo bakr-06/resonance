@@ -2,7 +2,7 @@ import uuid
 
 from pydantic import BaseModel
 
-from schemas.exchanges import ExchangeResponse
+from schemas.messages import MessageResponse
 
 
 class CreateSessionRequest(BaseModel):
@@ -24,4 +24,4 @@ class SessionResponse(BaseModel):
     created_at: str
     ended_at: str | None
     is_active: bool
-    exchanges: list[ExchangeResponse] = []
+    messages: list[MessageResponse] = []

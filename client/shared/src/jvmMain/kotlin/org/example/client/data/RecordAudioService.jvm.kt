@@ -37,7 +37,7 @@ actual class RecordAudioService {
         newLine.open(format)
         newLine.start()
 
-        val tmpFile = File.createTempFile("resonance-exchange", ".wav")
+        val tmpFile = File.createTempFile("resonance-message", ".wav")
         outputFile = tmpFile
         line = newLine
 

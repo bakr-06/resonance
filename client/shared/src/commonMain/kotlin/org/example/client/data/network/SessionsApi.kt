@@ -10,7 +10,7 @@ import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.http.ContentType
 import io.ktor.http.contentType
-import org.example.client.data.network.dto.ExchangeDto
+import org.example.client.data.network.dto.CreateMessagesDto
 import org.example.client.data.network.dto.SessionDto
 import java.io.File
 
@@ -36,10 +36,10 @@ class SessionsApi(
     suspend fun endSession(sessionId: String): SessionDto =
         httpClient.post("$baseUrl/sessions/$sessionId/end").body()
 
-    suspend fun createExchange(sessionId: String, audioFile: File): ExchangeDto {
+    suspend fun createMessages(sessionId: String, audioFile: File): CreateMessagesDto {
         val audioBytes = audioFile.readBytes()
 
-        return httpClient.post("$baseUrl/sessions/$sessionId/exchanges") {
+        return httpClient.post("$baseUrl/sessions/$sessionId/messages") {
             setBody(
                 MultiPartFormDataContent(
                     formData {
