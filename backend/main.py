@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from config import settings
 from db.database import engine
 from logging_config import configure_logging
-from routes import session_router
+from routes import session_router, user_router
 from services.ai_analysis import SYSTEM_PROMPT
 
 logger = logging.getLogger(__name__)
@@ -17,9 +17,9 @@ configure_logging(settings.log_level)
 
 
 async def _check_ollama_model(
-        http_client: httpx.AsyncClient,
-        base_url: str,
-        model: str,
+    http_client: httpx.AsyncClient,
+    base_url: str,
+    model: str,
 ) -> None:
     """Log a clear warning if Ollama is unreachable or the model is not pulled."""
     try:
@@ -66,6 +66,7 @@ async def lifespan(fastapi_app: FastAPI) -> AsyncIterator[None]:
 app: FastAPI = FastAPI(lifespan=lifespan)
 
 app.include_router(session_router)
+app.include_router(user_router)
 
 
 @app.get("/")

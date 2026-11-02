@@ -11,7 +11,7 @@ from db.database import DbSession
 from db.models import Session as SessionModel
 from logging_config import session_log_extra
 from schemas.exchanges import ExchangeResponse
-from schemas.sessions import CreateSessionResponse, SessionResponse
+from schemas.sessions import CreateSessionRequest, CreateSessionResponse, SessionResponse
 from services.ai_analysis import generate_title
 from services.context_window import context_window_cache
 from . import session_router
@@ -21,15 +21,26 @@ logger = logging.getLogger(__name__)
 
 @session_router.post("/sessions", response_model=CreateSessionResponse, status_code=HTTPStatus.CREATED)
 async def create_session(
-        db_session: DbSession,
+    db_session: DbSession,
+    body: CreateSessionRequest,
 ) -> CreateSessionResponse:
-    session = SessionModel()
+    from db.models import User
+
+    user = await db_session.get(User, body.user_id)
+    if user is None:
+        raise HTTPException(
+            status_code=HTTPStatus.NOT_FOUND,
+            detail=f"User {body.user_id} not found",
+        )
+
+    session = SessionModel(user_id=body.user_id)
     db_session.add(session)
     await db_session.commit()
     await db_session.refresh(session)
     logger.info("Created session id=%s", session.id, extra=session_log_extra(session.id))
     return CreateSessionResponse(
         id=session.id,
+        user_id=session.user_id,
         title=session.title,
         created_at=session.created_at.isoformat(),
         is_active=session.is_active,
@@ -48,6 +59,7 @@ async def list_sessions(
     return [
         SessionResponse(
             id=s.id,
+            user_id=s.user_id,
             title=s.title,
             created_at=s.created_at.isoformat(),
             ended_at=s.ended_at.isoformat() if s.ended_at else None,
@@ -77,6 +89,7 @@ async def get_active_session(
     exchanges = sorted(session.exchanges, key=lambda e: e.created_at)
     return SessionResponse(
         id=session.id,
+        user_id=session.user_id,
         title=session.title,
         created_at=session.created_at.isoformat(),
         ended_at=session.ended_at.isoformat() if session.ended_at else None,
@@ -115,6 +128,7 @@ async def get_session_details(
     exchanges = sorted(session.exchanges, key=lambda e: e.created_at)
     return SessionResponse(
         id=session.id,
+        user_id=session.user_id,
         title=session.title,
         created_at=session.created_at.isoformat(),
         ended_at=session.ended_at.isoformat() if session.ended_at else None,
@@ -192,6 +206,7 @@ async def end_session(
     exchanges = sorted(session.exchanges, key=lambda e: e.created_at)
     return SessionResponse(
         id=session.id,
+        user_id=session.user_id,
         title=session.title,
         created_at=session.created_at.isoformat(),
         ended_at=session.ended_at.isoformat() if session.ended_at else None,

@@ -1,7 +1,8 @@
+import enum
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -10,10 +11,19 @@ class Base(DeclarativeBase):
     pass
 
 
+class SocialStatus(str, enum.Enum):
+    SINGLE = "single"
+    MARRIED = "married"
+
+    def __str__(self) -> str:
+        return self.value
+
+
 class Session(Base):
     __tablename__ = "session"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("resonance_user.id"), nullable=False)
     title: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
@@ -21,6 +31,7 @@ class Session(Base):
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
+    user: Mapped["User"] = relationship(back_populates="sessions")
     exchanges: Mapped[list["Exchange"]] = relationship(
         back_populates="session", cascade="all, delete-orphan"
     )
@@ -78,3 +89,24 @@ class AnalysisMetrics(Base):
     processing_ms: Mapped[int] = mapped_column(Integer)
 
     exchange: Mapped["Exchange"] = relationship(back_populates="analysis_metrics")
+
+
+class User(Base):
+    __tablename__ = "resonance_user"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    social_status: Mapped[SocialStatus] = mapped_column(Enum(SocialStatus, values_callable=lambda obj: [e.value for e in obj]), nullable=False)
+    date_of_birth: Mapped[date] = mapped_column(Date, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+    sessions: Mapped[list["Session"]] = relationship(
+        back_populates="user", cascade="all, delete-orphan"
+    )
