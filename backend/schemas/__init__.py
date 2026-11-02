@@ -1,9 +1,9 @@
-from schemas.exchanges import ExchangeResponse, UpdateExchangeRequest
+from schemas.messages import CreateMessagesResponse, MessageResponse
 from schemas.sessions import CreateSessionResponse, SessionResponse
 
 __all__ = [
-    "ExchangeResponse",
-    "UpdateExchangeRequest",
+    "CreateMessagesResponse",
+    "MessageResponse",
     "CreateSessionResponse",
     "SessionResponse",
 ]

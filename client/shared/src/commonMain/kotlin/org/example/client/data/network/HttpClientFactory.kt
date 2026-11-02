@@ -16,7 +16,7 @@ internal fun createHttpClient(): HttpClient =
             json(Json { ignoreUnknownKeys = true })
         }
         // TODO(recording): 60s request timeout is applied globally to every request this client makes.
-        //  It exists for the exchange upload (Whisper + LLM can be slow), but it also caps trivial calls
+        //  It exists for the message upload (Whisper + LLM can be slow), but it also caps trivial calls
         //  like getSessions. If slow endpoints grow, move toward per-request or endpoint-specific timeouts
         //  rather than one blanket value. Revisit when the network layer gets more endpoints.
         install(HttpTimeout) {

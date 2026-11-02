@@ -10,13 +10,13 @@ import org.example.client.Result
 import org.example.client.data.RecordAudioService
 import org.example.client.data.SessionsRepository
 
-class ExchangeViewModel internal constructor(
+class SessionViewModel internal constructor(
     private val sessionsRepository: SessionsRepository,
     private val recordAudioService: RecordAudioService
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(ExchangeUiState())
-    val uiState: StateFlow<ExchangeUiState> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow(SessionUiState())
+    val uiState: StateFlow<SessionUiState> = _uiState.asStateFlow()
 
     init {
         initialize()
@@ -57,7 +57,7 @@ class ExchangeViewModel internal constructor(
             println("VM init: using $source session id=${activeSession.id}")
             _uiState.value = _uiState.value.copy(
                 title = activeSession.title ?: "",
-                exchanges = activeSession.exchanges.map { it.toExchangeUi() },
+                messages = activeSession.messages.map { it.toMessageUi() },
                 activeSessionId = activeSession.id,
                 isLoadingDetails = false,
                 errorMessage = null,
@@ -158,19 +158,19 @@ class ExchangeViewModel internal constructor(
             }
 
             // TODO(recording): Data loss on upload failure — audioFile.delete() runs unconditionally
-            //  right after createExchange, before the failure branch is examined. If createExchange fails
+            //  right after createMessages, before the failure branch is examined. If createMessages fails
             //  (server down, LLM timeout, HTTP 4xx/5xx), the user's voice note is destroyed with no retry
             //  possible — the audio existed only in this temp file. Fix when improving: on Result.Error
             //  keep the file and offer a retry action, or delete lazily (only on success / when replaced).
-            val result = sessionsRepository.createExchange(sessionId, audioFile)
+            val result = sessionsRepository.createMessages(sessionId, audioFile)
             audioFile.delete()
 
             when (result) {
                 is Result.Success -> {
-                    val exchange = result.data.toExchangeUi()
+                    val newMessages = result.data.map { it.toMessageUi() }
                     _uiState.value = _uiState.value.copy(
                         recordingStatus = RecordingStatus.Idle,
-                        exchanges = _uiState.value.exchanges + exchange,
+                        messages = _uiState.value.messages + newMessages,
                     )
                 }
 
@@ -191,7 +191,7 @@ class ExchangeViewModel internal constructor(
                 is Result.Success -> {
                     _uiState.value = _uiState.value.copy(
                         title = result.data.title ?: "",
-                        exchanges = result.data.exchanges.map { it.toExchangeUi() },
+                        messages = result.data.messages.map { it.toMessageUi() },
                         activeSessionId = result.data.id,
                         isLoadingDetails = false,
                     )

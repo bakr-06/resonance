@@ -1,27 +1,24 @@
 # Resonance
 
 A voice journaling app. Users record voice notes in journaling sessions;
-each recording is transcribed and analyzed by AI for reflection and mood.
+each recording is transcribed and kept as a message alongside the AI's
+replies.
 
 ## Language
 
 **Session**:
-A bounded journaling session containing one or more exchanges.
-Sessions are created implicitly when journaling begins and ended
-explicitly by the user or via a 10-hour inactivity timeout.
+A bounded journaling conversation made of messages. Sessions are created
+implicitly when journaling begins and ended explicitly by the user or via a
+10-hour inactivity timeout.
 _Avoid_: Conversation, block, recording-session
 
-**Exchange**:
-A single voice recording within a session. Each exchange is
-transcribed (Whisper) and analyzed (LLM) for reflection and
-detected mode. An exchange cannot exist outside a session.
-_Avoid_: Entry, recording, note, voice-note
+**Message**:
+One entry in a session's log: either a recorded voice note after
+transcription or the AI's reply. Messages are ordered by time and never
+change role. An unanswered user message is still a complete message.
+_Avoid_: Exchange, entry, turn, recording, note, voice-note
 
-**Reflection**:
-The AI-generated thoughtful response to an exchange's transcript.
-_Avoid_: Analysis, feedback, comment
-
-**Detected Mode**:
-The emotional/intentional mode classified by the AI analysis:
-`venting`, `clarity`, or `heard`.
-_Avoid_: Mood, category, type, classification
+**Role**:
+Who produced a message: `user` for recorded voice notes, `assistant` for AI
+replies. A role never changes after a message is stored.
+_Avoid_: Speaker, author, type, sender

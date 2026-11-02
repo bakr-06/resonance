@@ -22,8 +22,8 @@ Accept: application/json
 
 ###
 
-### Create an exchange in a session (replace with actual ID)
-POST http://127.0.0.1:8000/sessions/REPLACE_WITH_SESSION_ID/exchanges
+### Record a message in a session (replace with actual ID)
+POST http://127.0.0.1:8000/sessions/REPLACE_WITH_SESSION_ID/messages
 Content-Type: multipart/form-data; boundary=----boundary
 
 ------boundary
@@ -32,16 +32,6 @@ Content-Type: audio/wav
 
 < ./voice.wav
 ------boundary--
-
-###
-
-### Update an exchange in a session (replace with actual IDs)
-PUT http://127.0.0.1:8000/sessions/REPLACE_WITH_SESSION_ID/exchanges/REPLACE_WITH_EXCHANGE_ID
-Content-Type: application/json
-
-{
-    "transcript": "This is the corrected and updated transcription text."
-}
 
 ###
 

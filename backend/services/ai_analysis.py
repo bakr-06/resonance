@@ -8,7 +8,7 @@ from typing import TypedDict
 import httpx
 
 from logging_config import PROMPT_LOGGER_NAME, session_log_extra
-from services.context_window import CachedExchange
+from services.context_window import CachedMessage
 
 logger = logging.getLogger(__name__)
 prompt_logger = logging.getLogger(PROMPT_LOGGER_NAME)
@@ -36,8 +36,7 @@ PROMPT_TOKEN_RESERVE: int = 1000
 
 
 class AnalysisResult(TypedDict):
-    reflection: str
-    detected_mode: str | None
+    content: str
     model_used: str
     prompt_tokens: int
     completion_tokens: int
@@ -59,46 +58,90 @@ def _max_chars(num_ctx: int) -> int:
     return (num_ctx - PROMPT_TOKEN_RESERVE) * CHARS_PER_TOKEN
 
 
-def _fit_text(text: str, num_ctx: int) -> str:
-    """Keep the start and end of over-long text so a long entry is not silently cut off."""
-    limit: int = _max_chars(num_ctx)
+def _fit_text(
+        text: str,
+        num_ctx: int,
+        max_chars: int | None = None,
+) -> str:
+    """Keep the start and end of over-long text so a long entry is not silently cut off.
+
+    ``max_chars`` lets a caller reserve part of the budget (for the system
+    prompt) without changing how the text itself is shortened.
+    """
+    limit: int = _max_chars(num_ctx) if max_chars is None else max_chars
+    limit = max(1, limit)
     if len(text) <= limit:
         return text
-    head_length: int = limit * 2 // 3
-    tail_length: int = limit - head_length
+
+    marker: str = "\n\n[...]\n\n"
+    if limit <= len(marker):
+        return text[:limit]
+
+    # Leave room for the marker so the result actually fits ``limit``.
+    body_length: int = limit - len(marker)
+    head_length: int = body_length * 2 // 3
+    tail_length: int = body_length - head_length
+    tail: str = text[-tail_length:] if tail_length else ""
     logger.warning(
         "Input truncated from %d to %d characters to fit the model context (%d tokens)",
         len(text),
         limit,
         num_ctx,
     )
-    return text[:head_length] + "\n\n[...]\n\n" + text[-tail_length:]
+    return text[:head_length] + marker + tail
 
 
-def _build_user_content(message: str, context: list[CachedExchange] | list[str]) -> str:
-    """Put earlier exchanges before the current one, and say nothing else."""
-    if not context:
-        return message
+def _build_messages(
+        system_prompt: str | None,
+        history: list[CachedMessage],
+        message: str,
+        num_ctx: int,
+) -> list[dict[str, str]]:
+    """Compose the chat payload: system prompt, role-tagged history, new message.
 
-    entries: str = "\n\n".join(
-        _format_exchange(exchange, index)
-        for index, exchange in enumerate(context, start=1)
-    )
-    return (
-        f"{entries}\n\n---\n\n"
-        "Current entry:\n"
-        f"{message}"
-    )
+    The current message is fitted first because it must never be lost. History
+    is then prepended newest first for as long as the character budget allows,
+    which keeps the most recent context and drops the oldest messages.
+    """
+    limit: int = _max_chars(num_ctx)
 
+    messages: list[dict[str, str]] = []
+    system_length: int = 0
+    if system_prompt and system_prompt.strip():
+        system_length = len(system_prompt)
+        messages.append({"role": "system", "content": system_prompt})
 
-def _format_exchange(exchange: CachedExchange | str, index: int) -> str:
-    if isinstance(exchange, str):
-        return f"Earlier entry {index}:\n{exchange}"
-    transcript = exchange.transcript
-    reflection = getattr(exchange, "reflection", "") or ""
-    if reflection.strip():
-        return f"Earlier entry {index}:\nUser: {transcript}\n\nAssistant: {reflection}"
-    return f"Earlier entry {index}:\n{transcript}"
+    # The current message must survive, and the system prompt is fixed, so
+    # history only gets whatever remains after both.
+    current_budget: int = max(1, limit - system_length)
+    current: str = _fit_text(message, num_ctx, max_chars=current_budget)
+
+    remaining: int = max(0, current_budget - len(current))
+    history_messages: list[dict[str, str]] = []
+    for cached in reversed(history):
+        if len(cached.content) > remaining:
+            # History is chronological, and we walk it newest first. Stopping
+            # here keeps a contiguous suffix; skipping this message to fit an
+            # older one would leave a hole in the conversation.
+            break
+        history_messages.append(
+            {"role": cached.role.value, "content": cached.content}
+        )
+        remaining -= len(cached.content)
+
+    dropped: int = len(history) - len(history_messages)
+    if dropped:
+        logger.warning(
+            "Dropped the %d oldest historical message(s) that did not fit "
+            "the model context (%d tokens)",
+            dropped,
+            num_ctx,
+        )
+
+    history_messages.reverse()
+    messages.extend(history_messages)
+    messages.append({"role": "user", "content": current})
+    return messages
 
 
 def _log_messages(messages: list[dict[str, str]], session_id: uuid.UUID) -> None:
@@ -186,8 +229,7 @@ async def _chat(
 
 def _empty_result(model: str) -> AnalysisResult:
     return AnalysisResult(
-        reflection="",
-        detected_mode=None,
+        content="",
         model_used=model,
         prompt_tokens=0,
         completion_tokens=0,
@@ -198,7 +240,7 @@ def _empty_result(model: str) -> AnalysisResult:
 
 async def analyze(
         message: str,
-        context: list[CachedExchange] | list[str],
+        context: list[CachedMessage],
         http_client: httpx.AsyncClient,
         base_url: str,
         model: str,
@@ -208,32 +250,11 @@ async def analyze(
 ) -> AnalysisResult:
     extra: dict[str, str] = session_log_extra(session_id)
     try:
-        filtered_context: list[CachedExchange] | list[str] = []
-        if context:
-            for exchange in context:
-                if isinstance(exchange, CachedExchange):
-                    reflection = exchange.reflection or ""
-                    if not reflection.strip():
-                        # Only a full exchange (transcription + response). If no response, skip.
-                        continue
-                    exchange_text = _format_exchange(exchange, 0)
-                    if len(exchange_text) > _max_chars(num_ctx):
-                        continue
-                    filtered_context.append(exchange)
-                else:
-                    filtered_context.append(exchange)
-
-        user_content = _build_user_content(message, filtered_context)
-        user_content = _fit_text(user_content, num_ctx)
-
-        messages: list[dict[str, str]] = []
-        if system_prompt and system_prompt.strip():
-            messages.append({"role": "system", "content": system_prompt})
-        messages.append(
-            {
-                "role": "user",
-                "content": user_content,
-            },
+        messages: list[dict[str, str]] = _build_messages(
+            system_prompt=system_prompt,
+            history=context,
+            message=message,
+            num_ctx=num_ctx,
         )
 
         data = await _chat(
@@ -248,16 +269,14 @@ async def analyze(
             session_id=session_id,
         )
 
-        content: str = data["message"]["content"]
+        content: str = data["message"]["content"].strip()
         logger.debug("Raw analysis content: %s", content, extra=extra)
 
-        reflection: str = content.strip()
-        if not reflection:
-            logger.warning("Ollama returned an empty reflection for model %r", model, extra=extra)
+        if not content:
+            logger.warning("Ollama returned an empty reply for model %r", model, extra=extra)
 
         return AnalysisResult(
-            reflection=reflection,
-            detected_mode=None,
+            content=content,
             model_used=data.get("model", model),
             prompt_tokens=data.get("prompt_eval_count", 0),
             completion_tokens=data.get("eval_count", 0),

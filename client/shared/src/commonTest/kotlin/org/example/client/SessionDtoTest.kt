@@ -1,6 +1,7 @@
 package org.example.client
 
 import kotlinx.serialization.json.Json
+import org.example.client.data.network.dto.MessageRole
 import org.example.client.data.network.dto.SessionDto
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -15,18 +16,25 @@ class SessionDtoTest {
         val payload = """
             {
               "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-              "title": "Morning reflection",
+              "user_id": "00000000-0000-0000-0000-000000000001",
+              "title": "Morning journal",
               "created_at": "2026-08-18T09:00:00Z",
               "ended_at": null,
               "is_active": true,
-              "exchanges": [
+              "messages": [
                 {
                   "id": "11111111-1111-1111-1111-111111111111",
                   "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-                  "transcript": "I had a rough day",
-                  "reflection": "That sounds hard",
-                  "detected_mode": "venting",
+                  "role": "user",
+                  "content": "I had a rough day",
                   "created_at": "2026-08-18T09:00:00Z"
+                },
+                {
+                  "id": "22222222-2222-2222-2222-222222222222",
+                  "session_id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+                  "role": "assistant",
+                  "content": "That sounds hard",
+                  "created_at": "2026-08-18T09:00:01Z"
                 }
               ]
             }
@@ -35,12 +43,14 @@ class SessionDtoTest {
         val dto = json.decodeFromString<SessionDto>(payload)
 
         assertEquals("3fa85f64-5717-4562-b3fc-2c963f66afa6", dto.id)
-        assertEquals("Morning reflection", dto.title)
+        assertEquals("Morning journal", dto.title)
         assertEquals("2026-08-18T09:00:00Z", dto.createdAt)
         assertNull(dto.endedAt)
         assertEquals(true, dto.isActive)
-        assertEquals(1, dto.exchanges.size)
-        assertEquals("I had a rough day", dto.exchanges[0].transcript)
-        assertEquals("venting", dto.exchanges[0].detectedMode)
+        assertEquals(2, dto.messages.size)
+        assertEquals(MessageRole.User, dto.messages[0].role)
+        assertEquals("I had a rough day", dto.messages[0].content)
+        assertEquals(MessageRole.Assistant, dto.messages[1].role)
+        assertEquals("That sounds hard", dto.messages[1].content)
     }
 }

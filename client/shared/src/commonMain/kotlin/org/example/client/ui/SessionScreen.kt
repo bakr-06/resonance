@@ -34,7 +34,7 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun SessionScreen(
-    viewModel: ExchangeViewModel,
+    viewModel: SessionViewModel,
     onSessionEnded: (sessionId: String) -> Unit,
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -135,9 +135,9 @@ fun SessionScreen(
                     }
                 }
 
-                uiState.isLoadingDetails -> Text(text = "Loading exchanges…")
-                uiState.exchanges.isNotEmpty() -> ExchangeChat(exchanges = uiState.exchanges)
-                else -> Text(text = "No exchanges yet")
+                uiState.isLoadingDetails -> Text(text = "Loading messages…")
+                uiState.messages.isNotEmpty() -> MessageList(messages = uiState.messages)
+                else -> Text(text = "No messages yet")
             }
         }
 
