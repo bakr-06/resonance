@@ -1,3 +1,4 @@
+import logging
 import os
 import pathlib
 import tempfile
@@ -15,12 +16,16 @@ from db.models import (
     MessageRole,
     Session,
     TranscriptionMetrics,
+    User,
 )
 from schemas.messages import CreateMessagesResponse, MessageResponse
 from services import stt
 from services.ai_analysis import analyze
 from services.context_window import CachedMessage, context_window_cache
+from services.user_profile import UserProfile, build_user_profile, compose_system_prompt
 from . import session_router
+
+logger = logging.getLogger(__name__)
 
 ALLOWED_AUDIO_TYPES: set[str] = {"audio/wav", "audio/wave", "audio/mpeg", "audio/mp3"}
 
@@ -117,7 +122,30 @@ async def create_messages(
     ollama_base_url = request.app.state.ollama_base_url
     ollama_model = request.app.state.ollama_model
     ollama_num_ctx = request.app.state.ollama_num_ctx
-    system_prompt = getattr(request.app.state, "analysis_system_prompt", None)
+
+    # The session is owned by exactly one user, so this is the identity of the
+    # person the model is talking to. Missing rows should not cost a recording:
+    # the FK makes it a data-integrity bug, not a user-facing error.
+    user: User | None = await db_session.get(User, session.user_id)
+    profile: UserProfile | None = None
+    if user is None:
+        logger.warning(
+            "User %s for session %s not found; analyzing without a profile",
+            session.user_id,
+            session_id,
+        )
+    else:
+        profile = build_user_profile(
+            name=user.name,
+            social_status=user.social_status,
+            date_of_birth=user.date_of_birth,
+        )
+
+    base_system_prompt: str | None = getattr(
+        request.app.state, "analysis_system_prompt", None
+    )
+    system_prompt: str | None = compose_system_prompt(base_system_prompt, profile)
+
     t0 = time.time()
     analysis_result = await analyze(
         user_message.content,

@@ -26,6 +26,7 @@ Monorepo with `backend/` (Python FastAPI) and `client/` (Kotlin Multiplatform / 
       empty title is not stored
 - **Validation**: Only `.wav`/`.mp3` allowed (checked by MIME type); empty files rejected
 - **Testing**: `python -m pytest -q` from `backend/`; `curl` or `test_main.http` for manual endpoint checks
+- **User identity**: `resonance_user` is loaded per recording and its profile (name, age, social status) is folded into the analysis system prompt; it is never stored in the message log or the context window. Title generation does not use it. The hardcoded dummy user remains the development shortcut until auth is added.
 
 ## Client (`client/`)
 

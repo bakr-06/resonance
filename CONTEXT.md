@@ -22,3 +22,10 @@ _Avoid_: Exchange, entry, turn, recording, note, voice-note
 Who produced a message: `user` for recorded voice notes, `assistant` for AI
 replies. A role never changes after a message is stored.
 _Avoid_: Speaker, author, type, sender
+
+**User Profile**:
+The identity facts the app knows about the person journaling: name, age, and
+social status. Age is derived from the stored date of birth on every request.
+The model receives the profile as background context in its system prompt, so
+it is never a message in the session log.
+_Avoid_: Account, persona, user data, metadata

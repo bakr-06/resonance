@@ -6,11 +6,12 @@ tests can assert the two central promises of the message model:
 
 1. The user message is committed before analysis starts.
 2. An empty reply never creates an assistant row.
+3. The user profile reaches the model as system context, never as a message.
 """
 
 import asyncio
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any, cast
 
 import pytest
@@ -21,7 +22,9 @@ from db.models import (
     Message,
     MessageRole,
     Session,
+    SocialStatus,
     TranscriptionMetrics,
+    User,
 )
 from routes import messages as messages_route
 from schemas.messages import CreateMessagesResponse
@@ -62,13 +65,19 @@ class FakeRequest:
 class FakeDbSession:
     """The slice of ``AsyncSession`` the endpoint uses, plus an event log."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, user: User | None) -> None:
         self.session: Session = session
+        self.user: User | None = user
         self.added: list[Any] = []
         self.events: list[str] = []
+        self.system_prompt: str | None = None
 
-    async def get(self, model: type, identity: uuid.UUID) -> Session | None:
-        return self.session if model is Session else None
+    async def get(self, model: type, identity: uuid.UUID) -> Session | User | None:
+        if model is Session and identity == self.session.id:
+            return self.session
+        if model is User and self.user is not None and identity == self.user.id:
+            return self.user
+        return None
 
     def add(self, instance: Any) -> None:
         self.added.append(instance)
@@ -104,10 +113,19 @@ class FakeContextWindow:
         return []
 
 
-def make_session() -> Session:
+def make_user() -> User:
+    return User(
+        id=uuid.uuid4(),
+        name="Bakr",
+        social_status=SocialStatus.SINGLE,
+        date_of_birth=date(2006, 3, 9),
+    )
+
+
+def make_session(user: User) -> Session:
     return Session(
         id=uuid.uuid4(),
-        user_id=uuid.uuid4(),
+        user_id=user.id,
         is_active=True,
     )
 
@@ -155,6 +173,7 @@ def install_fakes(
         # The user message must already be committed when analysis starts.
         assert db_session.events.count("commit") == 1
         db_session.events.append("analyze")
+        db_session.system_prompt = system_prompt
         return analysis_result(reply)
 
     monkeypatch.setattr(messages_route.stt, "transcribe", transcribe)
@@ -176,8 +195,9 @@ def call_endpoint(db_session: FakeDbSession) -> CreateMessagesResponse:
 def test_empty_reply_stores_only_the_user_message(
         monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    session = make_session()
-    db_session = FakeDbSession(session)
+    user = make_user()
+    session = make_session(user)
+    db_session = FakeDbSession(session, user)
     cache = FakeContextWindow()
     install_fakes(monkeypatch, db_session, cache, reply="")
 
@@ -198,8 +218,9 @@ def test_empty_reply_stores_only_the_user_message(
 def test_non_empty_reply_stores_ordered_user_and_assistant_messages(
         monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    session = make_session()
-    db_session = FakeDbSession(session)
+    user = make_user()
+    session = make_session(user)
+    db_session = FakeDbSession(session, user)
     cache = FakeContextWindow()
     install_fakes(monkeypatch, db_session, cache, reply=LLM_REPLY)
 
@@ -221,6 +242,47 @@ def test_non_empty_reply_stores_ordered_user_and_assistant_messages(
     assert assistant_message.transcription_metrics is None
     assert response.messages[1].content == LLM_REPLY
     assert [message.role for message in cache.appended] == [
+        MessageRole.USER,
+        MessageRole.ASSISTANT,
+    ]
+
+
+def test_analysis_receives_the_user_profile_in_the_system_prompt(
+        monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user = make_user()
+    session = make_session(user)
+    db_session = FakeDbSession(session, user)
+    cache = FakeContextWindow()
+    install_fakes(monkeypatch, db_session, cache, reply=LLM_REPLY)
+
+    call_endpoint(db_session)
+
+    prompt: str | None = db_session.system_prompt
+    assert prompt is not None
+    # The behaviour prompt stays first so the profile cannot override it.
+    assert prompt.startswith("system prompt")
+    assert "Name: Bakr" in prompt
+    assert "Social status: single" in prompt
+    assert "Age: " in prompt
+    # The profile is context, not part of the stored conversation.
+    assert all("Name: Bakr" not in message.content for message in cache.appended)
+
+
+def test_analysis_without_a_user_keeps_the_base_prompt(
+        monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user = make_user()
+    session = make_session(user)
+    db_session = FakeDbSession(session, user=None)
+    cache = FakeContextWindow()
+    install_fakes(monkeypatch, db_session, cache, reply=LLM_REPLY)
+
+    call_endpoint(db_session)
+
+    # A broken ownership row must not cost the recording.
+    assert db_session.system_prompt == "system prompt"
+    assert [message.role for message in db_session.added] == [
         MessageRole.USER,
         MessageRole.ASSISTANT,
     ]
