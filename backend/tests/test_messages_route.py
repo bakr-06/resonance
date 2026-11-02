@@ -117,6 +117,7 @@ def make_user() -> User:
     return User(
         id=uuid.uuid4(),
         name="Bakr",
+        occupation="Student software developer",
         social_status=SocialStatus.SINGLE,
         date_of_birth=date(2006, 3, 9),
     )
@@ -263,6 +264,7 @@ def test_analysis_receives_the_user_profile_in_the_system_prompt(
     # The behaviour prompt stays first so the profile cannot override it.
     assert prompt.startswith("system prompt")
     assert "Name: Bakr" in prompt
+    assert "Occupation: Student software developer" in prompt
     assert "Social status: single" in prompt
     assert "Age: " in prompt
     # The profile is context, not part of the stored conversation.

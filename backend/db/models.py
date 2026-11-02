@@ -110,6 +110,7 @@ class User(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    occupation: Mapped[str] = mapped_column(String(255), nullable=False)
     social_status: Mapped[SocialStatus] = mapped_column(Enum(SocialStatus, values_callable=lambda obj: [e.value for e in obj]), nullable=False)
     date_of_birth: Mapped[date] = mapped_column(Date, nullable=False)
     created_at: Mapped[datetime] = mapped_column(

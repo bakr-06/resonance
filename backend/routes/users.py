@@ -18,6 +18,7 @@ async def create_user(
 ) -> UserResponse:
     user = User(
         name=body.name,
+        occupation=body.occupation,
         social_status=body.social_status,
         date_of_birth=body.date_of_birth,
     )
@@ -49,6 +50,8 @@ async def update_user(user_id: uuid.UUID, db_session: DbSession, body: UpdateUse
         raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail=f"User {user_id} not found")
     if body.name is not None:
         user.name = body.name
+    if body.occupation is not None:
+        user.occupation = body.occupation
     if body.social_status is not None:
         user.social_status = body.social_status
     if body.date_of_birth is not None:

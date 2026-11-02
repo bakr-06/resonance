@@ -17,7 +17,7 @@ About the person you are talking to:
 - Social status: single
 ```
 
-The model receives name, derived age, and social status. `age` is computed from `date_of_birth` at request time and never stored, so it cannot go stale. The raw birth date is not sent. If the user row is missing, the recording proceeds with the base prompt and a warning is logged, because a broken ownership row is a data-integrity bug that must not cost the user their entry.
+The model receives name, derived age, occupation, and social status. `age` is computed from `date_of_birth` at request time and never stored, so it cannot go stale. The raw birth date is not sent. If the user row is missing, the recording proceeds with the base prompt and a warning is logged, because a broken ownership row is a data-integrity bug that must not cost the user their entry.
 
 ## Considered Options
 

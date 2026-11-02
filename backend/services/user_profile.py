@@ -24,6 +24,7 @@ class UserProfile:
     name: str
     age: int
     social_status: SocialStatus
+    occupation: str
 
 
 def calculate_age(date_of_birth: date, today: date | None = None) -> int:
@@ -47,6 +48,7 @@ def calculate_age(date_of_birth: date, today: date | None = None) -> int:
 
 def build_user_profile(
         name: str,
+        occupation: str,
         social_status: SocialStatus,
         date_of_birth: date,
         today: date | None = None,
@@ -56,6 +58,7 @@ def build_user_profile(
         name=name,
         age=calculate_age(date_of_birth, today),
         social_status=social_status,
+        occupation=occupation,
     )
 
 
@@ -65,6 +68,7 @@ def render_user_profile(profile: UserProfile) -> str:
         "About the person you are talking to:\n"
         f"- Name: {profile.name}\n"
         f"- Age: {profile.age}\n"
+        f"- Occupation: {profile.occupation}\n"
         f"- Social status: {profile.social_status.value}\n"
         "Use these details only when they are relevant to the conversation. "
         "Do not repeat them back to the person."

@@ -8,6 +8,7 @@ from db.models import SocialStatus
 
 class UserBase(BaseModel):
     name: str
+    occupation: str
     social_status: SocialStatus
     date_of_birth: date
 
@@ -25,6 +26,7 @@ class CreateUserRequest(UserBase):
 
 class UpdateUserRequest(BaseModel):
     name: str | None = None
+    occupation: str | None = None
     social_status: SocialStatus | None = None
     date_of_birth: date | None = None
 
@@ -41,6 +43,7 @@ class UpdateUserRequest(BaseModel):
 class UserResponse(BaseModel):
     id: uuid.UUID
     name: str
+    occupation: str
     social_status: SocialStatus
     date_of_birth: date
     created_at: datetime

@@ -30,6 +30,7 @@ def test_future_birth_date_never_produces_a_negative_age() -> None:
 def test_profile_carries_the_derived_age_and_enum_status() -> None:
     profile = build_user_profile(
         name="Bakr",
+        occupation="Student software developer",
         social_status=SocialStatus.SINGLE,
         date_of_birth=date(2006, 3, 9),
         today=date(2026, 3, 9),
@@ -39,12 +40,14 @@ def test_profile_carries_the_derived_age_and_enum_status() -> None:
         name="Bakr",
         age=20,
         social_status=SocialStatus.SINGLE,
+        occupation="Student software developer",
     )
 
 
 def test_rendered_profile_uses_the_enum_value_not_its_name() -> None:
     profile = build_user_profile(
         name="Bakr",
+        occupation="Student software developer",
         social_status=SocialStatus.SINGLE,
         date_of_birth=date(2006, 3, 9),
         today=date(2026, 3, 9),
@@ -54,12 +57,18 @@ def test_rendered_profile_uses_the_enum_value_not_its_name() -> None:
 
     assert "Name: Bakr" in rendered
     assert "Age: 20" in rendered
+    assert "Occupation: Student software developer" in rendered
     assert "Social status: single" in rendered
     assert "SocialStatus" not in rendered
 
 
 def test_compose_keeps_the_base_prompt_first() -> None:
-    profile = UserProfile(name="Bakr", age=20, social_status=SocialStatus.SINGLE)
+    profile = UserProfile(
+        name="Bakr",
+        age=20,
+        social_status=SocialStatus.SINGLE,
+        occupation="Student software developer",
+    )
 
     composed: str | None = compose_system_prompt("base prompt", profile)
 
@@ -73,7 +82,12 @@ def test_compose_without_a_profile_returns_the_base_prompt_unchanged() -> None:
 
 
 def test_compose_without_a_base_prompt_returns_only_the_profile() -> None:
-    profile = UserProfile(name="Bakr", age=20, social_status=SocialStatus.SINGLE)
+    profile = UserProfile(
+        name="Bakr",
+        age=20,
+        social_status=SocialStatus.SINGLE,
+        occupation="Student software developer",
+    )
 
     composed: str | None = compose_system_prompt(None, profile)
 

@@ -137,6 +137,7 @@ async def create_messages(
     else:
         profile = build_user_profile(
             name=user.name,
+            occupation=user.occupation,
             social_status=user.social_status,
             date_of_birth=user.date_of_birth,
         )
